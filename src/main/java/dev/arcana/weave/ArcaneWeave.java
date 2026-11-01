@@ -67,8 +67,8 @@ public final class ArcaneWeave {
         public StandardSymbolDefinition {
             requireNamespacedId(symbolId, "standard symbol id");
             requireIdentifier(family, "symbol family");
-            inputs = immutablePorts(inputs, "inputs");
-            outputs = immutablePorts(outputs, "outputs");
+            inputs = StandardSymbolRegistry.immutablePorts(inputs, "inputs");
+            outputs = StandardSymbolRegistry.immutablePorts(outputs, "outputs");
             parameters = Map.copyOf(Objects.requireNonNull(parameters, "parameters"));
             parameters.forEach((id, definition) -> {
                 requireIdentifier(id, "parameter key");
