@@ -98,13 +98,16 @@ class PlayerArcanaProfileCodecTest {
         var restored = PlayerArcanaProfileCodec.decode(
                 PlayerArcanaProfileCodec.encode(profile()));
 
+        String source = """
+                grim "spark" { sigil "arcana:effect/light"(power = 2); }
+                """;
         var preparation = dev.arcana.language.CastingPreparationPipeline.prepare(
-                "grim \\"spark\\" { sigil \\"arcana:effect/light\\"(power = 2); }",
-                restored.language());
+                source, restored.language());
         assertTrue(preparation.successful(), () -> preparation.diagnostics().toString());
 
-        var trigger = CastingTriggerRecognizer.recognize(
-                "grim \\"spark\\" {} Astra", restored.triggers());
+        var trigger = CastingTriggerRecognizer.recognize("""
+                grim "spark" {} Astra
+                """, restored.triggers());
         assertEquals(CastingTriggerRecognizer.Status.ACTIVATED, trigger.status());
     }
 
