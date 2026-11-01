@@ -6,12 +6,13 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.registries.DeferredRegister;
+import java.util.function.Supplier;
 
 public final class ArcanaCreativeTabs {
     public static final DeferredRegister<CreativeModeTab> TABS =
             DeferredRegister.create(BuiltInRegistries.CREATIVE_MODE_TAB, Arcana.MOD_ID);
 
-    public static final var ARCANA = TABS.register("arcana", () ->
+    public static final Supplier<CreativeModeTab> ARCANA = TABS.register("arcana", () ->
             CreativeModeTab.builder()
                     .title(Component.translatable("itemGroup.arcana"))
                     .icon(() -> new ItemStack(ArcanaItems.GRIMOIRE.get()))
