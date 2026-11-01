@@ -113,8 +113,10 @@ class CanonicalScriptTest {
                                 java.util.Map.of("maxIterations", "4")),
                         new dev.arcana.weave.ArcaneWeave.CanonicalGlyph("bodyStart", "arcana:control/entry", java.util.Map.of())
                 ),
-                List.of(new dev.arcana.weave.ArcaneWeave.CanonicalConnection(
-                        "start", "flow", "repeat", "flow")),
+                List.of(
+                        new dev.arcana.weave.ArcaneWeave.CanonicalConnection("start", "flow", "repeat", "flow"),
+                        new dev.arcana.weave.ArcaneWeave.CanonicalConnection("repeat", "body", "bodyStart", "flow")
+                ),
                 List.of(new dev.arcana.weave.ArcaneWeave.CanonicalRegion(
                         "repeatBody", "repeat", "body", "bodyStart", "bodyStart",
                         List.of("bodyStart"), null))
