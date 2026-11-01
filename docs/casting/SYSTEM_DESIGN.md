@@ -316,3 +316,13 @@ Its lifecycle is `EDITING -> PREPARED -> RUNNING -> COMPLETED`, with terminal `F
 The window's cancel action discards an editing or prepared draft without setting a runtime cancellation signal. If the cast is running, cancel raises the cooperative signal and enters CANCELLED; it does not claim to roll back effects already committed. `detachView()` deliberately leaves the session unchanged, so closing a screen does not implicitly stop an active cast. Terminal sessions require explicit reset before reuse.
 
 This is a loader-independent lifecycle controller, not yet a Minecraft Screen or runtime adapter. The in-game GUI, microphone integration, player-specific persistent language/trigger settings, and scheduler handoff remain separate implementation tasks.
+
+## 22. World-scoped player configuration persistence
+
+`PlayerArcanaProfile` contains a player's language converter definition and ordinary voice-command trigger phrases. `PlayerArcanaProfileCodec` serializes this configuration with a strict schema version, bounded field sizes, and rejection of unknown fields. `PlayerArcanaProfileStore` indexes profiles by player UUID, applies an overall world-data size limit, and produces deterministic JSON.
+
+`PlayerArcanaProfilesSavedData` persists the store in the Overworld's SavedData storage. All dimensions in the same save therefore share the same server-authoritative profiles, while a different world save has a different data file. Mutations mark SavedData dirty; callers should perform them on the logical server thread. The API is available through `PlayerArcanaProfilesSavedData.get(ServerLevel)`.
+
+The profile intentionally excludes learned knowledge, spell unlocks, and capability permissions. A converter definition only describes how source language maps to canonical Arcana syntax. It does not prove comprehension, grant a spell, authorize a capability, or increase casting control. Knowledge/research progression must be represented by a separate model and separate persistence rules. The converter is world-scoped and is not automatically copied into another world.
+
+This persistence layer is implemented, but there is not yet a player-facing language editor, trigger-settings screen, packet protocol, or command workflow. Client-submitted edits must be validated and committed by the logical server; clients must never write SavedData directly.
