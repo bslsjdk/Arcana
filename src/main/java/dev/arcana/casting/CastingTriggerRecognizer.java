@@ -136,12 +136,19 @@ public final class CastingTriggerRecognizer {
             return Integer.compare(b.endTokenExclusive(), a.endTokenExclusive());
         });
 
-        for (int i = 1; i < matches.size(); i++) {
-            Match previous = matches.get(i - 1);
-            Match current = matches.get(i);
-            if (current.startToken() < previous.endTokenExclusive()
-                    && current.activation() != previous.activation()) {
-                return ambiguous("Activation and cancellation phrases overlap.");
+        int furthestActivationEnd = -1;
+        int furthestCancellationEnd = -1;
+        for (Match match : matches) {
+            if (match.activation()) {
+                if (furthestCancellationEnd > match.startToken()) {
+                    return ambiguous("Activation and cancellation phrases overlap.");
+                }
+                furthestActivationEnd = Math.max(furthestActivationEnd, match.endTokenExclusive());
+            } else {
+                if (furthestActivationEnd > match.startToken()) {
+                    return ambiguous("Activation and cancellation phrases overlap.");
+                }
+                furthestCancellationEnd = Math.max(furthestCancellationEnd, match.endTokenExclusive());
             }
         }
 
