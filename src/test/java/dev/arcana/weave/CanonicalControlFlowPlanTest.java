@@ -32,8 +32,8 @@ class CanonicalControlFlowPlanTest {
                 edge("yes", "flow", "join", "left"),
                 edge("no", "flow", "join", "right")
         ), List.of(
-                region("trueArm", "branch", "whenTrue", "yes", "join", "left", List.of("yes")),
-                region("falseArm", "branch", "whenFalse", "no", "join", "right", List.of("no"))
+                region("trueArm", "branch", "whenTrue", "yes", "yes", "flow", List.of("yes")),
+                region("falseArm", "branch", "whenFalse", "no", "no", "flow", List.of("no"))
         ));
 
         var result = CanonicalControlFlowPlan.compile(weave, registry);
