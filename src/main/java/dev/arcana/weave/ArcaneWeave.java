@@ -93,12 +93,27 @@ public final class ArcaneWeave {
         }
     }
 
-    public record CanonicalWeave(String id, int version, List<CanonicalGlyph> glyphs) {
+    public record CanonicalConnection(String fromGlyph, String fromPort, String toGlyph, String toPort) {
+        public CanonicalConnection {
+            requireIdentifier(fromGlyph, "source glyph");
+            requireIdentifier(fromPort, "source port");
+            requireIdentifier(toGlyph, "target glyph");
+            requireIdentifier(toPort, "target port");
+        }
+    }
+
+    public record CanonicalWeave(String id, int version, List<CanonicalGlyph> glyphs,
+                                 List<CanonicalConnection> connections) {
+        public CanonicalWeave(String id, int version, List<CanonicalGlyph> glyphs) {
+            this(id, version, glyphs, List.of());
+        }
         public CanonicalWeave {
             requireNamespacedId(id, "weave id");
             if (version < 1) throw new IllegalArgumentException("Weave version must be positive.");
             glyphs = List.copyOf(Objects.requireNonNull(glyphs, "glyphs"));
+            connections = List.copyOf(Objects.requireNonNull(connections, "connections"));
             if (glyphs.size() > MAX_GLYPHS) throw new IllegalArgumentException("Weave exceeds the glyph limit.");
+            if (connections.size() > MAX_VEINS) throw new IllegalArgumentException("Weave exceeds the connection limit.");
         }
     }
 
@@ -181,6 +196,10 @@ public final class ArcaneWeave {
             add(defs, symbol("arcana:reference/position", "reference",
                     Map.of(), ports("position", Essence.VECTOR3),
                     params(decimalParameter("x"), decimalParameter("y"), decimalParameter("z")),
+                    ControlFlow.DATA, 1, null, true));
+            add(defs, symbol("arcana:reference/number", "reference",
+                    Map.of(), ports("number", Essence.NUMBER),
+                    params(decimalParameter("value")),
                     ControlFlow.DATA, 1, null, true));
             add(defs, symbol("arcana:reference/entity", "reference",
                     Map.of(), ports("entity", Essence.ENTITY_REF),
@@ -317,7 +336,100 @@ public final class ArcaneWeave {
                 }
             }
         }
+        Map<String, CanonicalGlyph> glyphsById = new LinkedHashMap<>();
+        for (CanonicalGlyph glyph : weave.glyphs()) glyphsById.putIfAbsent(glyph.instanceId(), glyph);
+        Set<String> boundInputs = new HashSet<>();
+        Set<String> seenConnections = new HashSet<>();
+        Map<String, List<String>> outgoing = new HashMap<>();
+        Map<String, Integer> indegree = new HashMap<>();
+        glyphsById.keySet().forEach(id -> indegree.put(id, 0));
+
+        for (CanonicalConnection connection : weave.connections()) {
+            CanonicalGlyph fromGlyph = glyphsById.get(connection.fromGlyph());
+            CanonicalGlyph toGlyph = glyphsById.get(connection.toGlyph());
+            if (fromGlyph == null || toGlyph == null) {
+                issues.add(new SymbolDiagnostic("CANONICAL_UNKNOWN_CONNECTION_GLYPH",
+                        "Connection references an unknown glyph instance.", fromGlyph == null
+                        ? connection.fromGlyph() : connection.toGlyph()));
+                continue;
+            }
+            String connectionKey = connection.fromGlyph() + ":" + connection.fromPort()
+                    + "->" + connection.toGlyph() + ":" + connection.toPort();
+            if (!seenConnections.add(connectionKey)) {
+                issues.add(new SymbolDiagnostic("CANONICAL_DUPLICATE_CONNECTION",
+                        "Duplicate canonical connection.", connection.toGlyph()));
+                continue;
+            }
+            StandardSymbolDefinition fromDefinition = registry.definition(fromGlyph.symbolId());
+            StandardSymbolDefinition toDefinition = registry.definition(toGlyph.symbolId());
+            if (fromDefinition == null || toDefinition == null
+                    || !fromDefinition.instantiable() || !toDefinition.instantiable()) continue;
+            PortDefinition output = fromDefinition.outputs().get(connection.fromPort());
+            PortDefinition input = toDefinition.inputs().get(connection.toPort());
+            if (output == null) {
+                issues.add(new SymbolDiagnostic("CANONICAL_UNKNOWN_OUTPUT_PORT",
+                        "Source port is not defined by the standard symbol.", fromGlyph.instanceId()));
+                continue;
+            }
+            if (input == null) {
+                issues.add(new SymbolDiagnostic("CANONICAL_UNKNOWN_INPUT_PORT",
+                        "Target port is not defined by the standard symbol.", toGlyph.instanceId()));
+                continue;
+            }
+            if (output.essence() != input.essence()) {
+                issues.add(new SymbolDiagnostic("CANONICAL_PORT_TYPE_MISMATCH",
+                        "Connected standard ports have incompatible types.", toGlyph.instanceId()));
+                continue;
+            }
+            String inputKey = toGlyph.instanceId() + ":" + input.id();
+            if (!boundInputs.add(inputKey)) {
+                issues.add(new SymbolDiagnostic("CANONICAL_INPUT_ALREADY_BOUND",
+                        "A required input port may only have one incoming connection.", toGlyph.instanceId()));
+                continue;
+            }
+            outgoing.computeIfAbsent(fromGlyph.instanceId(), ignored -> new ArrayList<>())
+                    .add(toGlyph.instanceId());
+            indegree.merge(toGlyph.instanceId(), 1, Integer::sum);
+        }
+
+        for (CanonicalGlyph glyph : glyphsById.values()) {
+            StandardSymbolDefinition definition = registry.definition(glyph.symbolId());
+            if (definition == null || !definition.instantiable()) continue;
+            for (PortDefinition input : definition.inputs().values()) {
+                if (input.required() && !boundInputs.contains(glyph.instanceId() + ":" + input.id())) {
+                    issues.add(new SymbolDiagnostic("CANONICAL_UNBOUND_REQUIRED_INPUT",
+                            "Required input port is not connected: " + input.id(), glyph.instanceId()));
+                }
+            }
+        }
+
+        List<String> queue = new ArrayList<>();
+        indegree.forEach((id, degree) -> { if (degree == 0) queue.add(id); });
+        int visited = 0;
+        for (int i = 0; i < queue.size(); i++) {
+            String id = queue.get(i);
+            visited++;
+            for (String target : outgoing.getOrDefault(id, List.of())) {
+                if (indegree.merge(target, -1, Integer::sum) == 0) queue.add(target);
+            }
+        }
+        if (visited != glyphsById.size()) {
+            issues.add(new SymbolDiagnostic("CANONICAL_UNBOUNDED_CYCLE",
+                    "Canonical connections must be acyclic; bounded repetition owns its internal loop.", null));
+        }
         return new SymbolValidation(issues);
+    }
+
+    /** Sum of Arcana-owned structural weights, not source-language length or mana cost. */
+    public static int canonicalComplexity(CanonicalWeave weave, StandardSymbolRegistry registry) {
+        SymbolValidation validation = validateCanonical(weave, registry);
+        if (!validation.valid()) throw new IllegalArgumentException("Cannot measure an invalid canonical weave.");
+        long total = 0;
+        for (CanonicalGlyph glyph : weave.glyphs()) {
+            total += registry.definition(glyph.symbolId()).complexityWeight();
+            if (total > Integer.MAX_VALUE) throw new IllegalArgumentException("Canonical complexity overflow.");
+        }
+        return (int) total;
     }
 
     public enum GlyphKind { INVOCATION, TRANSFORM, BRANCH, NEXUS, REPETITION, WARD, SIGIL, CORE, MANIFESTATION }
