@@ -218,4 +218,22 @@ class CanonicalSymbolRegistryTest {
                 .noneMatch(issue -> issue.code().equals("CANONICAL_REGION_OVERLAP")));
     }
 
+
+    @Test
+    void unrelatedControlRegionsCannotShareGlyphInstances() {
+        var weave = new ArcaneWeave.CanonicalWeave("arcana:sibling_overlap", 1, List.of(
+                new ArcaneWeave.CanonicalGlyph("branch", "arcana:control/branch", Map.of()),
+                new ArcaneWeave.CanonicalGlyph("shared", "arcana:control/entry", Map.of())
+        ), List.of(), List.of(
+                new ArcaneWeave.CanonicalRegion("trueArm", "branch", "whenTrue",
+                        "shared", "shared", List.of("shared"), null),
+                new ArcaneWeave.CanonicalRegion("falseArm", "branch", "whenFalse",
+                        "shared", "shared", List.of("shared"), null)
+        ));
+
+        assertTrue(ArcaneWeave.validateCanonical(
+                weave, ArcaneWeave.StandardSymbolRegistry.builtins()).diagnostics().stream()
+                .anyMatch(issue -> issue.code().equals("CANONICAL_REGION_OVERLAP")));
+    }
+
 }
