@@ -127,7 +127,7 @@ class CanonicalScriptTest {
 
         assertTrue(parsed.successful(), () -> parsed.diagnostics().toString());
         assertEquals(weave, parsed.weave());
-        assertTrue(source.contains("^repeatBody(repeat.body)[bodyStart>bodyStart](bodyStart)@-;"));
+        assertTrue(source.contains("^repeatBody(repeat.body)[bodyStart>bodyStart.flow](bodyStart)@-;"));
     }
 
     @Test
@@ -138,9 +138,9 @@ class CanonicalScriptTest {
         String entry = CanonicalScript.encodeSymbol("arcana:control/entry");
         String source = branch + "#branch;" + repeat + "#repeat{maxIterations=2};"
                 + entry + "#inside;" + entry + "#outside;"
-                + "^trueArm(branch.whenTrue)[repeat>repeat](repeat,inside)@-;"
-                + "^falseArm(branch.whenFalse)[outside>outside](outside)@-;"
-                + "^body(repeat.body)[outside>outside](outside)@trueArm;";
+                + "^trueArm(branch.whenTrue)[repeat>repeat.flow](repeat,inside)@-;"
+                + "^falseArm(branch.whenFalse)[outside>outside.flow](outside)@-;"
+                + "^body(repeat.body)[outside>outside.flow](outside)@trueArm;";
         var parsed = CanonicalScript.parseWeave(source, "arcana:invalid_nested", 1, registry);
 
         assertFalse(parsed.successful());
