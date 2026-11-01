@@ -41,6 +41,8 @@ The first implementation branch establishes:
 - an immutable standard-symbol registry with concrete typed ports, parameter schemas, control-flow classifications, complexity weights, and capability identifiers;
 - canonical graph validation against registry-owned ports, including type checks, required-input binding, duplicate-connection rejection, and raw-cycle rejection;
 - a structural complexity score derived from canonical symbol weights, independent of player-language source length;
+- a versioned canonical script character table and structured direct-writing codec that round-trips validated canonical weaves;
+- explicit branch-arm and bounded-repeat body regions, with nested-region containment, boundary membership, sibling-overlap, and parent-cycle validation;
 - the older free-form graph retained only as a legacy prototype.
 
 The v0.2 translator supports vocabulary aliases and deterministic token-phrase rules. Phrase rules can expand a short expression into a larger canonical source fragment or compress a longer phrase into a short canonical token. It does **not yet** support arbitrary grammar productions, word-order transformations, inflection, syntax-tree patterns, or context-sensitive disambiguation. The semantic validator is static analysis only: it does not execute capabilities or mutate the Minecraft world.
