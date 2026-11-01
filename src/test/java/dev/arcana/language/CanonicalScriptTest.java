@@ -101,4 +101,50 @@ class CanonicalScriptTest {
         assertFalse(unsafe.successful());
     }
 
+
+    @Test
+    void structuredScriptRoundTripsBoundedRepeatRegion() {
+        var registry = dev.arcana.weave.ArcaneWeave.StandardSymbolRegistry.builtins();
+        var weave = new dev.arcana.weave.ArcaneWeave.CanonicalWeave(
+                "arcana:test_repeat", 1,
+                List.of(
+                        new dev.arcana.weave.ArcaneWeave.CanonicalGlyph("start", "arcana:control/entry", java.util.Map.of()),
+                        new dev.arcana.weave.ArcaneWeave.CanonicalGlyph("repeat", "arcana:control/repeat",
+                                java.util.Map.of("maxIterations", "4")),
+                        new dev.arcana.weave.ArcaneWeave.CanonicalGlyph("bodyStart", "arcana:control/entry", java.util.Map.of())
+                ),
+                List.of(new dev.arcana.weave.ArcaneWeave.CanonicalConnection(
+                        "start", "flow", "repeat", "flow")),
+                List.of(new dev.arcana.weave.ArcaneWeave.CanonicalRegion(
+                        "repeatBody", "repeat", "body", "bodyStart", "bodyStart",
+                        List.of("bodyStart"), null))
+        );
+
+        String source = CanonicalScript.encodeWeave(weave, registry);
+        var parsed = CanonicalScript.parseWeave(source, weave.id(), weave.version(), registry);
+
+        assertTrue(parsed.successful(), () -> parsed.diagnostics().toString());
+        assertEquals(weave, parsed.weave());
+        assertTrue(source.contains("^repeatBody(repeat.body)[bodyStart>bodyStart](bodyStart)@-;"));
+    }
+
+    @Test
+    void parserRejectsRegionThatEscapesItsParent() {
+        var registry = dev.arcana.weave.ArcaneWeave.StandardSymbolRegistry.builtins();
+        String branch = CanonicalScript.encodeSymbol("arcana:control/branch");
+        String repeat = CanonicalScript.encodeSymbol("arcana:control/repeat");
+        String entry = CanonicalScript.encodeSymbol("arcana:control/entry");
+        String source = branch + "#branch;" + repeat + "#repeat{maxIterations=2};"
+                + entry + "#inside;" + entry + "#outside;"
+                + "^trueArm(branch.whenTrue)[repeat>repeat](repeat,inside)@-;"
+                + "^falseArm(branch.whenFalse)[outside>outside](outside)@-;"
+                + "^body(repeat.body)[outside>outside](outside)@trueArm;";
+        var parsed = CanonicalScript.parseWeave(source, "arcana:invalid_nested", 1, registry);
+
+        assertFalse(parsed.successful());
+        assertTrue(parsed.diagnostics().stream().anyMatch(d ->
+                d.startsWith("CANONICAL_REGION_OWNER_OUTSIDE_PARENT")
+                        || d.startsWith("CANONICAL_REGION_ESCAPES_PARENT")));
+    }
+
 }
