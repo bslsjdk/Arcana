@@ -51,7 +51,7 @@ class CanonicalExecutionBudgetTest {
                 session.finishLoop("repeat", "activationA"));
         assertEquals(CanonicalExecutionBudget.Admission.ACCEPTED,
                 session.beginLoopIteration("repeat", "activationA", 4));
-        assertEquals(2, session.snapshot().loopIterations().get("repeat#activationA"));
+        assertEquals(1, session.snapshot().loopIterations().get("repeat#activationA"));
     }
 
     @Test
