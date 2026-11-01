@@ -42,9 +42,38 @@ public final class ArcanaLanguage {
         LexResult lexed = Lexer.scan(source);
         if (lexed.hasErrors()) return new TranslationResult(null, lexed.diagnostics());
 
+        List<Token> tokens = lexed.tokens();
         StringBuilder output = new StringBuilder(source.length());
         int copiedUntil = 0;
-        for (Token token : lexed.tokens()) {
+        for (int i = 0; i < tokens.size() - 1;) {
+            PhraseRule matched = null;
+            int matchedLength = 0;
+            for (PhraseRule rule : language.phraseRules()) {
+                List<String> pattern = tokenPattern(rule.sourcePhrase());
+                if (pattern.size() <= matchedLength || i + pattern.size() > tokens.size() - 1) continue;
+                boolean same = true;
+                for (int offset = 0; offset < pattern.size(); offset++) {
+                    if (!pattern.get(offset).equals(tokenKey(tokens.get(i + offset)))) {
+                        same = false;
+                        break;
+                    }
+                }
+                if (same) {
+                    matched = rule;
+                    matchedLength = pattern.size();
+                }
+            }
+            if (matched != null) {
+                Token first = tokens.get(i);
+                Token last = tokens.get(i + matchedLength - 1);
+                output.append(source, copiedUntil, first.span().startOffset());
+                output.append(matched.canonicalReplacement());
+                copiedUntil = last.span().endOffset();
+                i += matchedLength;
+                continue;
+            }
+
+            Token token = tokens.get(i++);
             if (token.type() != TokenType.IDENTIFIER) continue;
             String replacement = language.keywordAliases().get(token.lexeme().toLowerCase(Locale.ROOT));
             if (replacement == null) continue;
@@ -53,6 +82,11 @@ public final class ArcanaLanguage {
             copiedUntil = token.span().endOffset();
         }
         output.append(source, copiedUntil, source.length());
+        if (output.length() > 65_536) {
+            return new TranslationResult(null, List.of(new Diagnostic(
+                    Severity.ERROR, "TRANS_OUTPUT_TOO_LARGE", "Translated output exceeds 65536 characters.",
+                    SourceSpan.point(0, 1, 1))));
+        }
         return new TranslationResult(output.toString(), List.of());
     }
 
@@ -111,13 +145,37 @@ public final class ArcanaLanguage {
         }
     }
 
-    public record LanguageDefinition(String id, int version, Map<String, String> keywordAliases) {
+    /** A phrase may expand to any canonical Arcana source fragment. */
+    public record PhraseRule(String sourcePhrase, String canonicalReplacement) {
+        public PhraseRule {
+            Objects.requireNonNull(sourcePhrase);
+            Objects.requireNonNull(canonicalReplacement);
+            if (sourcePhrase.isBlank() || canonicalReplacement.isBlank()) {
+                throw new IllegalArgumentException("Phrase rules cannot be blank.");
+            }
+            List<String> tokens = tokenPattern(sourcePhrase);
+            if (tokens.isEmpty() || tokens.size() > 64) {
+                throw new IllegalArgumentException("Phrase patterns must contain 1 to 64 tokens.");
+            }
+            if (tokens.stream().anyMatch(key -> key.startsWith("EOF:"))) {
+                throw new IllegalArgumentException("Phrase patterns cannot contain EOF.");
+            }
+        }
+    }
+
+    public record LanguageDefinition(String id, int version, Map<String, String> keywordAliases,
+                                     List<PhraseRule> phraseRules) {
         private static final Set<String> CANONICAL = Set.of(
                 "spell", "let", "invoke", "true", "false", "Number", "Text", "Boolean");
+
+        public LanguageDefinition(String id, int version, Map<String, String> keywordAliases) {
+            this(id, version, keywordAliases, List.of());
+        }
 
         public LanguageDefinition {
             Objects.requireNonNull(id);
             Objects.requireNonNull(keywordAliases);
+            phraseRules = List.copyOf(Objects.requireNonNull(phraseRules));
             if (!id.matches("[a-z0-9_.-]+:[a-z0-9_./-]+")) {
                 throw new IllegalArgumentException("Language id must be namespaced.");
             }
@@ -134,7 +192,26 @@ public final class ArcanaLanguage {
                 }
             });
             keywordAliases = Map.copyOf(normalized);
+            Set<List<String>> patterns = new java.util.HashSet<>();
+            for (PhraseRule rule : phraseRules) {
+                if (!patterns.add(tokenPattern(rule.sourcePhrase()))) {
+                    throw new IllegalArgumentException("Conflicting duplicate phrase pattern: " + rule.sourcePhrase());
+                }
+            }
         }
+    }
+
+    private static List<String> tokenPattern(String phrase) {
+        LexResult result = Lexer.scan(phrase);
+        if (result.hasErrors()) throw new IllegalArgumentException("Invalid phrase pattern.");
+        return result.tokens().stream().filter(token -> token.type() != TokenType.EOF)
+                .map(ArcanaLanguage::tokenKey).toList();
+    }
+
+    private static String tokenKey(Token token) {
+        String value = token.type() == TokenType.IDENTIFIER
+                ? token.lexeme().toLowerCase(Locale.ROOT) : token.lexeme();
+        return token.type().name() + ":" + value;
     }
 
     public sealed interface Statement permits LetStatement, InvokeStatement {
