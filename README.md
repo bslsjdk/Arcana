@@ -27,7 +27,7 @@ The first implementation branch establishes:
 - a semantic validation pass for primitive types, sequential variable declarations, duplicate declarations, undefined references, and capability identifier format;
 - unit tests for parsing, translation equivalence, semantic validation, and malformed input.
 
-The v0.1 translator currently maps vocabulary aliases for canonical keywords. It does **not yet** support arbitrary grammar productions, word-order changes, inflection, or syntax templates. Those remain the next language-engine milestone. The semantic validator is static analysis only: it does not execute capabilities or mutate the Minecraft world.
+The v0.1 translator currently maps vocabulary aliases for canonical keywords. It does **not yet** support arbitrary grammar productions, word-order changes, inflection, or syntax templates. Those remain a later language-engine milestone. The semantic validator is static analysis only: it does not execute capabilities or mutate the Minecraft world.\n\nA first loader-independent casting-rules prototype now models caster rank, spell rank, medium capacity, and direct versus ritual casting. The initial casting-media design is documented in [Casting System Design](docs/casting/SYSTEM_DESIGN.md). Minecraft grimoire/wand items, spellbook UI, magic-circle blocks, learning, and actual spell execution are **not implemented yet**. The next gameplay milestone is a grimoire + wand + one harmless test spell.
 
 ## Compilation pipeline
 
