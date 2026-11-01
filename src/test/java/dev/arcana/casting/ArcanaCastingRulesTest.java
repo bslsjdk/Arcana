@@ -19,12 +19,12 @@ class ArcanaCastingRulesTest {
         var caster = new ArcanaCastingRules.CasterProfile(ArcanaCastingRules.Rank.MASTER);
         var spell = spell(ArcanaCastingRules.Rank.APPRENTICE,
                 ArcanaCastingRules.Rank.APPRENTICE, ArcanaCastingRules.MediumKind.FOCUS_CRYSTAL);
-        var focusCrystal = new ArcanaCastingRules.MediumProfile(
+        var focusMedium = new ArcanaCastingRules.MediumProfile(
                 ArcanaCastingRules.MediumKind.FOCUS_CRYSTAL,
                 ArcanaCastingRules.Rank.ARCHMAGE, true, true);
 
         var result = ArcanaCastingRules.evaluate(
-                caster, spell, focusCrystal, ArcanaCastingRules.CastingMode.DIRECT);
+                caster, spell, focusMedium, ArcanaCastingRules.CastingMode.DIRECT);
 
         assertTrue(result.allowed(), () -> result.issues().toString());
     }
@@ -34,12 +34,12 @@ class ArcanaCastingRulesTest {
         var caster = new ArcanaCastingRules.CasterProfile(ArcanaCastingRules.Rank.APPRENTICE);
         var spell = spell(ArcanaCastingRules.Rank.MASTER,
                 ArcanaCastingRules.Rank.EXPERT, ArcanaCastingRules.MediumKind.FOCUS_CRYSTAL);
-        var focusCrystal = new ArcanaCastingRules.MediumProfile(
+        var focusMedium = new ArcanaCastingRules.MediumProfile(
                 ArcanaCastingRules.MediumKind.FOCUS_CRYSTAL,
                 ArcanaCastingRules.Rank.SOVEREIGN, true, true);
 
         var result = ArcanaCastingRules.evaluate(
-                caster, spell, focusCrystal, ArcanaCastingRules.CastingMode.DIRECT);
+                caster, spell, focusMedium, ArcanaCastingRules.CastingMode.DIRECT);
 
         assertFalse(result.allowed());
         assertTrue(result.issues().stream().anyMatch(i -> i.code().equals("SPELL_RANK_TOO_HIGH")));
@@ -51,12 +51,12 @@ class ArcanaCastingRulesTest {
         var caster = new ArcanaCastingRules.CasterProfile(ArcanaCastingRules.Rank.ARCHMAGE);
         var spell = spell(ArcanaCastingRules.Rank.MASTER,
                 ArcanaCastingRules.Rank.MASTER, ArcanaCastingRules.MediumKind.FOCUS_CRYSTAL);
-        var focusCrystal = new ArcanaCastingRules.MediumProfile(
+        var focusMedium = new ArcanaCastingRules.MediumProfile(
                 ArcanaCastingRules.MediumKind.FOCUS_CRYSTAL,
                 ArcanaCastingRules.Rank.ADEPT, true, false);
 
         var result = ArcanaCastingRules.evaluate(
-                caster, spell, focusCrystal, ArcanaCastingRules.CastingMode.DIRECT);
+                caster, spell, focusMedium, ArcanaCastingRules.CastingMode.DIRECT);
 
         assertFalse(result.allowed());
         assertTrue(result.issues().stream().anyMatch(i -> i.code().equals("MEDIUM_RANK_LIMIT")));
@@ -83,12 +83,12 @@ class ArcanaCastingRulesTest {
         var caster = new ArcanaCastingRules.CasterProfile(ArcanaCastingRules.Rank.MASTER);
         var spell = spell(ArcanaCastingRules.Rank.ADEPT,
                 ArcanaCastingRules.Rank.ADEPT, ArcanaCastingRules.MediumKind.MAGIC_CIRCLE);
-        var focusCrystal = new ArcanaCastingRules.MediumProfile(
+        var focusMedium = new ArcanaCastingRules.MediumProfile(
                 ArcanaCastingRules.MediumKind.FOCUS_CRYSTAL,
                 ArcanaCastingRules.Rank.SOVEREIGN, true, true);
 
         var result = ArcanaCastingRules.evaluate(
-                caster, spell, focusCrystal, ArcanaCastingRules.CastingMode.RITUAL);
+                caster, spell, focusMedium, ArcanaCastingRules.CastingMode.RITUAL);
 
         assertFalse(result.allowed());
         assertTrue(result.issues().stream().anyMatch(i -> i.code().equals("INCOMPATIBLE_MEDIUM")));
