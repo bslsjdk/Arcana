@@ -106,9 +106,9 @@ No wand or staff is part of this design baseline.
 
 Player-authored source and custom language definitions are untrusted.
 
-1. The player authors a working in a chosen language or directly in canonical Arcana.
-2. The player's language front end translates it deterministically into registered canonical symbols and/or canonical Arcana syntax.
-3. The canonical lexer/parser produces the standard representation.
+1. The player authors a working either directly in the Arcana canonical glyph script or in a player-authored language.
+2. Direct-script input is read by the canonical script reader; player-language input is deterministically translated into the same canonical representation.
+3. Both routes use the same canonical lexer/parser and produce the same standard representation.
 4. Semantic validation checks types, references, structure, and declared effects.
 5. Weave validation checks symbol registry references, graph structure, and bounded control flow.
 6. Installation validation checks every host, interface, fragment, and connection.
@@ -138,7 +138,7 @@ Only canonical, validated structures proceed to execution. The server does not n
 
 The repository currently contains:
 - a bounded canonical-language lexer/parser and a small canonical AST;
-- a v0.1 translator that maps vocabulary aliases only;
+- a v0.2 translator with keyword aliases and deterministic phrase rules;
 - static semantic validation;
 - a loader-independent casting-rules prototype where rank represents control capacity, not knowledge;
 - registered grimoire, focus crystal, and scroll items;
@@ -161,7 +161,24 @@ The older ArcanaCircuit graph is a legacy technical prototype and is not the pla
 
 The first playable experience should let a player author a small working, validate it, install it on a suitable host, activate it through a permitted interface, and receive clear diagnostics when any part is invalid.
 
-## 10. Registry-backed canonical symbol model (implementation milestone)
+## 10. Canonical magical writing system
+
+Direct use of Arcana's own standard magical writing is a first-class authoring route. A player does not need to create a personal language before writing or casting a working. Player-authored languages are optional front ends that converge on the same canonical representation.
+
+Keep three layers separate:
+- **Semantic symbol definition:** the Arcana-owned operation or structural role, identified by a stable namespaced ID and eventually defined by typed ports, parameter schema, validation contract, and bounded runtime meaning.
+- **Canonical written glyph:** the visible character/grapheme that writes a reference to a semantic symbol. Its visual outline does not define its meaning.
+- **Player language:** a player-authored writing/vocabulary/grammar system that deterministically translates into canonical symbols or canonical AST templates.
+
+The current nine registry IDs are provisional semantic building blocks, not the finished alphabet. Their English labels are not the visible magical characters. Broad categories may later contain multiple concrete, narrowly specified symbols. Do not assign permanent Unicode code points to the nine broad IDs before the concrete inventory and visual writing system are designed.
+
+A glyph's identity must be its canonical Arcana registry key, not its Unicode code point or font outline. A custom font may use Unicode Private Use Area slots as a rendering/transport detail, but those values must never become semantic identities or authority boundaries. The versioned canonical script table resolves written graphemes to registered symbol IDs. A plain-text fallback notation may be used for tests, diagnostics, and accessibility.
+
+Direct-script and translated input must share one parser, semantic validator, weave validator, and runtime pipeline. There must not be a separate execution engine for direct glyph input. Unknown glyphs, ambiguous grapheme boundaries, and unregistered symbol references fail closed.
+
+The full script specification and implementation sequence are in [Canonical Glyph Script](../language/CANONICAL_GLYPH_SCRIPT.md). This is a design baseline only: the original font, complete character inventory, direct-script reader, and in-game writing UI are not yet implemented.
+
+## 11. Registry-backed canonical symbol model (implementation milestone)
 
 The code now has a separate registry-backed canonical model:
 - `CanonicalGlyph` stores an instance id, an Arcana standard-symbol id, and data parameters only. It has no fields for player-defined ports, operation kinds, or semantic behavior.
