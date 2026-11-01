@@ -218,3 +218,20 @@ A value can be written only to an output port declared by the glyph's registered
 Each newly stored output reserves one live runtime-value slot; replacing an existing output does not consume another slot. Clearing a glyph's outputs releases those slots. Store construction rejects invalid canonical weaves, and each store is tied to its own weave and budget session.
 
 This milestone is a typed value store, not yet a node scheduler or evaluator. It does not execute arithmetic symbols, evaluate branch conditions, access Minecraft state, resolve entity/block references, spend mana, or authorize capabilities. Those responsibilities must be added explicitly in later runtime layers.
+
+
+## 14. First pure-data node evaluator
+
+`CanonicalNodeEvaluator` is the first executable layer above the validated value store. It currently evaluates only these standard symbols:
+
+- `arcana:reference/number`: parses its declared decimal parameter and publishes a NUMBER output.
+- `arcana:reference/position`: parses finite x/y/z parameters and publishes a VECTOR3 output.
+- `arcana:data/add`: reads its two explicitly connected NUMBER inputs and publishes their DECIMAL128 sum.
+- `arcana:data/equal`: compares two NUMBER inputs by numeric value (scale-insensitive) and publishes BOOLEAN.
+- `arcana:data/less_than`: compares two NUMBER inputs and publishes BOOLEAN.
+
+Every evaluation of a member glyph consumes one node step before evaluation. Unknown glyphs do not consume budget. Registered but not-yet-implemented symbols are rejected as unsupported; there is no fallback behavior based on symbol names. Missing connected runtime values are reported distinctly and do not cause invented defaults.
+
+Numeric outputs remain bounded by the runtime value type's precision and scale limits. Position components must be finite. The evaluator and its value store share the same per-cast budget session. Its exposed budget snapshot is immutable.
+
+This is still a deliberately small evaluator, not the full scheduler. It does not automatically order nodes, execute branch or repeat regions, evaluate control-flow signals, resolve entity/block references, inspect Minecraft state, mutate the world, authorize capabilities, or consume mana. A future scheduler must choose evaluation order from the validated control-flow plan and explicit data dependencies, and must treat an unavailable input as a scheduling/dependency condition rather than retrying without bounds.
