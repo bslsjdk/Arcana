@@ -112,6 +112,27 @@ The code now contains `CanonicalScript`, a versioned identity table for the 18 c
 - Whitespace is currently ignored between glyphs.
 - Round-trip tests verify that encoding and decoding preserve the exact canonical symbol IDs.
 
+| Slot | Canonical symbol ID |
+|---|---|
+| U+E000 | `arcana:control/entry` |
+| U+E001 | `arcana:control/branch` |
+| U+E002 | `arcana:control/join` |
+| U+E003 | `arcana:control/repeat` |
+| U+E004 | `arcana:data/add` |
+| U+E005 | `arcana:data/equal` |
+| U+E006 | `arcana:data/less_than` |
+| U+E007 | `arcana:sense/block` |
+| U+E008 | `arcana:sense/entity` |
+| U+E009 | `arcana:sense/light_level` |
+| U+E00A | `arcana:mana/absorb` |
+| U+E00B | `arcana:mana/store` |
+| U+E00C | `arcana:mana/release` |
+| U+E00D | `arcana:reference/position` |
+| U+E00E | `arcana:reference/number` |
+| U+E00F | `arcana:reference/entity` |
+| U+E010 | `arcana:constraint/ward` |
+| U+E011 | `arcana:effect/light` |
+
 These PUA values are **not the final visual alphabet**. Without the Arcana font, they may render as empty boxes or fallback symbols. They are stable identity/transport slots for this script-table version, not semantic IDs. A future font can draw original forms for these slots without changing their meanings.
 
 The current codec only decodes a flat sequence of symbol references. It does not yet encode parameters, instance identifiers, typed connections, nesting, or complete canonical weaves. A sequence of glyphs is therefore not automatically a valid executable construction; the graph model and validator remain authoritative until the structured script grammar is implemented.
