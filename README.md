@@ -54,6 +54,8 @@ See:
 
 - [Architecture](docs/ARCHITECTURE.md)
 - [Canonical grammar v0.1](docs/language/CANONICAL_GRAMMAR.md)
+- [Canonical glyph script](docs/language/CANONICAL_GLYPH_SCRIPT.md)
+- [Standard symbol catalog v0.1](docs/language/STANDARD_SYMBOL_CATALOG.md)
 - [Casting and Weave Design](docs/casting/SYSTEM_DESIGN.md)
 
 ## Build
