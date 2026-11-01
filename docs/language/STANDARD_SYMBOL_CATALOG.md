@@ -43,7 +43,7 @@ A reference is not permission to mutate the referenced object. Every world read/
 
 | Symbol ID | Inputs | Outputs | Meaning |
 |---|---|---|---|
-| `arcana:control/entry` | none | `flow:SIGNAL` | Starts a working |
+| `arcana:control/entry` | optional `flow:SIGNAL` | `flow:SIGNAL` | Starts a working, or receives the owner signal at a nested control-region entry |
 | `arcana:control/branch` | `condition:BOOLEAN`, `flow:SIGNAL` | `whenTrue:SIGNAL`, `whenFalse:SIGNAL` | Selects exactly one path from a validated condition |
 | `arcana:control/join` | `left:SIGNAL`, `right:SIGNAL` | `flow:SIGNAL` | Explicitly joins two control paths; runtime synchronization semantics still need specification |
 | `arcana:control/repeat` | `flow:SIGNAL` | `body:SIGNAL`, `completed:SIGNAL` | Bounded repetition; required integer `maxIterations` in 1..1024. The body is a nested sub-weave; loop-back is internal runtime behavior, not a raw graph cycle |
