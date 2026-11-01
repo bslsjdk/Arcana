@@ -295,3 +295,13 @@ Tests cover activation placement, ordered cancellation, multi-word phrases, exac
 A cancellation before activation discards pending text. A cancellation after activation, including one later in the same batch, enters `CANCELLED` and raises a thread-safe cooperative cancellation signal for a future runtime adapter. Ambiguous or invalid input fails closed; if a runtime was active, the controller raises cancellation before entering `FAILED`. Terminal sessions cannot accept more input until explicitly reset.
 
 This controller still does not translate the accumulated source, create a canonical weave, instantiate a scheduler, or execute world effects. Its payload is untrusted source text. Runtime integration must translate and validate it before any execution and must observe the cancellation signal at bounded interpreter steps.
+
+## 19. Deterministic source preparation pipeline
+
+`CastingPreparationPipeline.prepare(source, language)` provides the first loader-independent bridge from a trigger-stripped player incantation to the existing canonical language front end. It performs, in order:
+
+1. bounded deterministic player-language translation;
+2. canonical lexing and parsing into `AstProgram`;
+3. static semantic validation of declarations, references, primitive types, and capability identifier syntax.
+
+The result distinguishes invalid requests, translation failures, parse failures, semantic failures, and successful preparation. A semantically invalid program may be retained in the result for diagnostics, but it is never marked prepared. The pipeline is data-only: it does not resolve capability permissions, compile an `ArcaneWeave`, install hosts, spend mana, or execute any effect. A future casting runtime must perform those separate validations before execution.
