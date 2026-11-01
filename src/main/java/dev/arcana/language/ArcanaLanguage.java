@@ -157,8 +157,8 @@ public final class ArcanaLanguage {
             if (tokens.isEmpty() || tokens.size() > 64) {
                 throw new IllegalArgumentException("Phrase patterns must contain 1 to 64 tokens.");
             }
-            if (tokens.stream().anyMatch(key -> key.startsWith("EOF:"))) {
-                throw new IllegalArgumentException("Phrase patterns cannot contain EOF.");
+            if (tokens.stream().anyMatch(key -> !key.startsWith("IDENTIFIER:"))) {
+                throw new IllegalArgumentException("Phrase patterns may contain words only; literals and punctuation are not rewritable.");
             }
         }
     }
