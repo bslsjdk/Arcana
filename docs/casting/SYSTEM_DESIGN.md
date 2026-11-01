@@ -234,7 +234,7 @@ Every evaluation of a member glyph consumes one node step before evaluation. Unk
 
 Numeric outputs remain bounded by the runtime value type's precision and scale limits. Position components must be finite. The evaluator and its value store share the same per-cast budget session. Its exposed budget snapshot is immutable.
 
-This is still a deliberately small evaluator, not the full scheduler. It does not automatically order nodes, execute branch or repeat regions, evaluate control-flow signals, resolve entity/block references, inspect Minecraft state, mutate the world, authorize capabilities, or consume mana. A future scheduler must choose evaluation order from the validated control-flow plan and explicit data dependencies, and must treat an unavailable input as a scheduling/dependency condition rather than retrying without bounds.
+This evaluator remains deliberately small and does not itself schedule nodes or interpret control flow. `CanonicalWeaveScheduler` now performs deterministic data-dependency ordering and interprets entry, branch, selected-arm join, and fixed-count repeat control flow around this evaluator. Neither layer resolves entity/block references, inspects Minecraft state, mutates the world, authorizes capabilities, or consumes mana.
 
 
 
