@@ -155,6 +155,23 @@ class CanonicalWeaveSchedulerTest {
     }
 
     @Test
+    void schedulerInstanceCannotExecuteTheSameCastTwice() {
+        var weave = new ArcaneWeave.CanonicalWeave("arcana:one_shot", 1, List.of(
+                glyph("value", "arcana:reference/number", Map.of("value", "4"))
+        ));
+        var scheduler = scheduler(weave, budget(4, 2));
+
+        var first = scheduler.execute();
+        var second = scheduler.execute();
+
+        assertEquals(CanonicalWeaveScheduler.Status.COMPLETED, first.status());
+        assertEquals(CanonicalWeaveScheduler.Status.FAILED, second.status());
+        assertEquals(1, first.budget().nodeSteps());
+        assertEquals(1, second.budget().nodeSteps());
+        assertTrue(second.diagnostics().getFirst().contains("one-shot"));
+    }
+
+    @Test
     void cancellationIsReportedWithoutClaimingCompletion() {
         var weave = new ArcaneWeave.CanonicalWeave("arcana:cancelled", 1, List.of(
                 glyph("value", "arcana:reference/number", Map.of("value", "9"))
