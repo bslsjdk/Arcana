@@ -24,13 +24,66 @@ public final class ArcaneWeave {
 
     private ArcaneWeave() { }
 
-    public enum Essence { MANA, SIGNAL, BOOLEAN, NUMBER, TEXT, VECTOR3 }
+    public enum Essence {
+        MANA, SIGNAL, BOOLEAN, NUMBER, TEXT, VECTOR3, ENTITY_REF, BLOCK_REF
+    }
+
+    public enum ControlFlow { ENTRY, LINEAR, BRANCH, JOIN, LOOP, TERMINAL, DATA }
+    public enum ParameterType { INTEGER, DECIMAL, BOOLEAN, IDENTIFIER }
+
+    public record PortDefinition(String id, Essence essence, boolean required) {
+        public PortDefinition {
+            requireIdentifier(id, "port id");
+            Objects.requireNonNull(essence, "essence");
+        }
+    }
+
+    public record ParameterDefinition(String id, ParameterType type, boolean required,
+                                      Long minimum, Long maximum) {
+        public ParameterDefinition {
+            requireIdentifier(id, "parameter id");
+            Objects.requireNonNull(type, "parameter type");
+            if (minimum != null && maximum != null && minimum > maximum)
+                throw new IllegalArgumentException("Parameter minimum exceeds maximum.");
+            if (type != ParameterType.INTEGER && (minimum != null || maximum != null))
+                throw new IllegalArgumentException("Only integer parameters may declare integer bounds.");
+        }
+    }
 
     /**
-     * Canonical symbol reference used by the registry-backed authoring model.
-     * The instance carries only an Arcana-owned symbol id and data parameters;
-     * it cannot declare ports, operations, or semantic behavior.
+     * Arcana-owned semantic contract. Ports and parameter schemas come only
+     * from this definition; player-authored glyph instances cannot override them.
      */
+    public record StandardSymbolDefinition(
+            String symbolId,
+            String family,
+            Map<String, PortDefinition> inputs,
+            Map<String, PortDefinition> outputs,
+            Map<String, ParameterDefinition> parameters,
+            ControlFlow controlFlow,
+            int complexityWeight,
+            String capabilityId,
+            boolean instantiable) {
+        public StandardSymbolDefinition {
+            requireNamespacedId(symbolId, "standard symbol id");
+            requireIdentifier(family, "symbol family");
+            inputs = immutablePorts(inputs, "inputs");
+            outputs = immutablePorts(outputs, "outputs");
+            parameters = Map.copyOf(Objects.requireNonNull(parameters, "parameters"));
+            parameters.forEach((id, definition) -> {
+                requireIdentifier(id, "parameter key");
+                if (!id.equals(definition.id())) throw new IllegalArgumentException("Parameter key mismatch.");
+            });
+            Objects.requireNonNull(controlFlow, "control flow");
+            if (complexityWeight < 1 || complexityWeight > 10_000)
+                throw new IllegalArgumentException("Invalid symbol complexity weight.");
+            if (capabilityId != null) requireNamespacedId(capabilityId, "capability id");
+            if (!instantiable && capabilityId != null)
+                throw new IllegalArgumentException("Abstract symbol categories cannot map to capabilities.");
+        }
+    }
+
+    /** Canonical symbol reference used by the registry-backed authoring model. */
     public record CanonicalGlyph(String instanceId, String symbolId, Map<String, String> parameters) {
         public CanonicalGlyph {
             requireIdentifier(instanceId, "glyph instance id");
@@ -40,7 +93,6 @@ public final class ArcaneWeave {
         }
     }
 
-    /** Registry-backed canonical weave. Player data can reference symbols but cannot define them. */
     public record CanonicalWeave(String id, int version, List<CanonicalGlyph> glyphs) {
         public CanonicalWeave {
             requireNamespacedId(id, "weave id");
@@ -57,42 +109,148 @@ public final class ArcaneWeave {
         public boolean valid() { return diagnostics.isEmpty(); }
     }
 
-    /** The one built-in registry is immutable and owned by Arcana, not player language data. */
+    /** Immutable Arcana-owned registry. No player-supplied definition can enter it. */
     public static final class StandardSymbolRegistry {
-        private final Map<String, Set<String>> parameterKeys;
+        private final Map<String, StandardSymbolDefinition> definitions;
 
-        private StandardSymbolRegistry(Map<String, Set<String>> definitions) {
-            Map<String, Set<String>> copy = new LinkedHashMap<>();
-            definitions.forEach((id, keys) -> {
-                requireNamespacedId(id, "standard symbol id");
-                copy.put(id, Set.copyOf(keys));
-            });
-            parameterKeys = Map.copyOf(copy);
+        private StandardSymbolRegistry(Map<String, StandardSymbolDefinition> definitions) {
+            this.definitions = Map.copyOf(new LinkedHashMap<>(definitions));
         }
 
         public static StandardSymbolRegistry builtins() {
-            Map<String, Set<String>> definitions = new LinkedHashMap<>();
-            definitions.put("arcana:invocation", Set.of());
-            definitions.put("arcana:transform", Set.of());
-            definitions.put("arcana:branch", Set.of());
-            definitions.put("arcana:nexus", Set.of());
-            definitions.put("arcana:repetition", Set.of("maxIterations"));
-            definitions.put("arcana:ward", Set.of());
-            definitions.put("arcana:sigil", Set.of());
-            definitions.put("arcana:core", Set.of());
-            definitions.put("arcana:manifestation", Set.of());
-            return new StandardSymbolRegistry(definitions);
+            Map<String, StandardSymbolDefinition> defs = new LinkedHashMap<>();
+
+            // Legacy semantic headings remain discoverable but cannot be instantiated.
+            for (String id : List.of("invocation", "transform", "branch", "nexus",
+                    "repetition", "ward", "sigil", "core", "manifestation")) {
+                add(defs, symbol("arcana:" + id, "category", Map.of(), Map.of(), Map.of(),
+                        ControlFlow.DATA, 1, null, false));
+            }
+
+            add(defs, symbol("arcana:control/entry", "control",
+                    Map.of(), ports("flow", Essence.SIGNAL), Map.of(),
+                    ControlFlow.ENTRY, 1, null, true));
+            add(defs, symbol("arcana:control/branch", "control",
+                    ports("condition", Essence.BOOLEAN, "flow", Essence.SIGNAL),
+                    ports("whenTrue", Essence.SIGNAL, "whenFalse", Essence.SIGNAL), Map.of(),
+                    ControlFlow.BRANCH, 3, null, true));
+            add(defs, symbol("arcana:control/join", "control",
+                    ports("left", Essence.SIGNAL, "right", Essence.SIGNAL),
+                    ports("flow", Essence.SIGNAL), Map.of(),
+                    ControlFlow.JOIN, 2, null, true));
+            add(defs, symbol("arcana:control/repeat", "control",
+                    ports("flow", Essence.SIGNAL), ports("next", Essence.SIGNAL),
+                    params(integerParameter("maxIterations", true, 1, MAX_REPETITIONS)),
+                    ControlFlow.LOOP, 4, null, true));
+
+            add(defs, symbol("arcana:data/add", "data",
+                    ports("left", Essence.NUMBER, "right", Essence.NUMBER),
+                    ports("result", Essence.NUMBER), Map.of(),
+                    ControlFlow.DATA, 1, null, true));
+            add(defs, symbol("arcana:data/compare", "data",
+                    ports("left", Essence.NUMBER, "right", Essence.NUMBER),
+                    ports("result", Essence.BOOLEAN), Map.of(),
+                    ControlFlow.DATA, 1, null, true));
+
+            add(defs, symbol("arcana:sense/block", "perception",
+                    ports("position", Essence.VECTOR3), ports("block", Essence.BLOCK_REF), Map.of(),
+                    ControlFlow.DATA, 2, "arcana:world/read_block", true));
+            add(defs, symbol("arcana:sense/entity", "perception",
+                    ports("position", Essence.VECTOR3, "radius", Essence.NUMBER),
+                    ports("entity", Essence.ENTITY_REF), Map.of(),
+                    ControlFlow.DATA, 3, "arcana:world/query_entities", true));
+            add(defs, symbol("arcana:sense/light_level", "perception",
+                    ports("position", Essence.VECTOR3), ports("level", Essence.NUMBER), Map.of(),
+                    ControlFlow.DATA, 2, "arcana:world/read_light", true));
+
+            add(defs, symbol("arcana:mana/absorb", "mana",
+                    ports("source", Essence.SIGNAL), ports("mana", Essence.MANA), Map.of(),
+                    ControlFlow.LINEAR, 2, "arcana:mana/absorb", true));
+            add(defs, symbol("arcana:mana/store", "mana",
+                    ports("mana", Essence.MANA, "flow", Essence.SIGNAL),
+                    ports("stored", Essence.SIGNAL), Map.of(),
+                    ControlFlow.LINEAR, 2, "arcana:mana/store", true));
+            add(defs, symbol("arcana:mana/release", "mana",
+                    ports("stored", Essence.SIGNAL), ports("mana", Essence.MANA), Map.of(),
+                    ControlFlow.LINEAR, 2, "arcana:mana/release", true));
+
+            add(defs, symbol("arcana:reference/position", "reference",
+                    Map.of(), ports("position", Essence.VECTOR3),
+                    params(decimalParameter("x"), decimalParameter("y"), decimalParameter("z")),
+                    ControlFlow.DATA, 1, null, true));
+            add(defs, symbol("arcana:reference/entity", "reference",
+                    Map.of(), ports("entity", Essence.ENTITY_REF),
+                    params(identifierParameter("selector")), ControlFlow.DATA, 1, null, true));
+
+            add(defs, symbol("arcana:constraint/ward", "constraint",
+                    ports("area", Essence.VECTOR3, "flow", Essence.SIGNAL),
+                    ports("permitted", Essence.SIGNAL), Map.of(),
+                    ControlFlow.LINEAR, 4, "arcana:world/ward_check", true));
+            add(defs, symbol("arcana:effect/light", "effect",
+                    ports("position", Essence.VECTOR3, "level", Essence.NUMBER, "flow", Essence.SIGNAL),
+                    ports("complete", Essence.SIGNAL), Map.of(),
+                    ControlFlow.TERMINAL, 3, "arcana:world/set_light", true));
+
+            return new StandardSymbolRegistry(defs);
         }
 
-        public boolean contains(String symbolId) {
-            return parameterKeys.containsKey(symbolId);
+        public boolean contains(String symbolId) { return definitions.containsKey(symbolId); }
+        public boolean isInstantiable(String symbolId) {
+            StandardSymbolDefinition definition = definitions.get(symbolId);
+            return definition != null && definition.instantiable();
         }
-
+        public StandardSymbolDefinition definition(String symbolId) { return definitions.get(symbolId); }
         public Set<String> allowedParameters(String symbolId) {
-            return parameterKeys.getOrDefault(symbolId, Set.of());
+            StandardSymbolDefinition definition = definitions.get(symbolId);
+            return definition == null ? Set.of() : definition.parameters().keySet();
         }
+        public Set<String> symbolIds() { return definitions.keySet(); }
 
-        public Set<String> symbolIds() { return parameterKeys.keySet(); }
+        private static void add(Map<String, StandardSymbolDefinition> defs, StandardSymbolDefinition definition) {
+            if (defs.putIfAbsent(definition.symbolId(), definition) != null)
+                throw new IllegalStateException("Duplicate built-in symbol: " + definition.symbolId());
+        }
+        private static StandardSymbolDefinition symbol(String id, String family,
+                Map<String, PortDefinition> inputs, Map<String, PortDefinition> outputs,
+                Map<String, ParameterDefinition> parameters, ControlFlow flow,
+                int weight, String capability, boolean instantiable) {
+            return new StandardSymbolDefinition(id, family, inputs, outputs, parameters,
+                    flow, weight, capability, instantiable);
+        }
+        private static Map<String, PortDefinition> ports(Object... values) {
+            if (values.length % 2 != 0) throw new IllegalArgumentException("Port declarations need id/type pairs.");
+            Map<String, PortDefinition> result = new LinkedHashMap<>();
+            for (int i = 0; i < values.length; i += 2) {
+                String id = (String) values[i];
+                Essence essence = (Essence) values[i + 1];
+                result.put(id, new PortDefinition(id, essence, true));
+            }
+            return Map.copyOf(result);
+        }
+        private static Map<String, PortDefinition> immutablePorts(Map<String, PortDefinition> values, String label) {
+            Objects.requireNonNull(values, label);
+            Map<String, PortDefinition> copy = new LinkedHashMap<>();
+            values.forEach((id, port) -> {
+                requireIdentifier(id, label + " port id");
+                if (!id.equals(port.id())) throw new IllegalArgumentException("Port key mismatch.");
+                copy.put(id, port);
+            });
+            return Map.copyOf(copy);
+        }
+        private static ParameterDefinition integerParameter(String id, boolean required, long min, long max) {
+            return new ParameterDefinition(id, ParameterType.INTEGER, required, min, max);
+        }
+        private static ParameterDefinition decimalParameter(String id) {
+            return new ParameterDefinition(id, ParameterType.DECIMAL, true, null, null);
+        }
+        private static ParameterDefinition identifierParameter(String id) {
+            return new ParameterDefinition(id, ParameterType.IDENTIFIER, true, null, null);
+        }
+        private static Map<String, ParameterDefinition> params(ParameterDefinition... values) {
+            Map<String, ParameterDefinition> result = new LinkedHashMap<>();
+            for (ParameterDefinition value : values) result.put(value.id(), value);
+            return Map.copyOf(result);
+        }
     }
 
     public static SymbolValidation validateCanonical(CanonicalWeave weave, StandardSymbolRegistry registry) {
@@ -107,33 +265,57 @@ public final class ArcaneWeave {
             if (!instances.add(glyph.instanceId())) {
                 issues.add(new SymbolDiagnostic("CANONICAL_DUPLICATE_INSTANCE", "Duplicate glyph instance id.", glyph.instanceId()));
             }
-            if (!registry.contains(glyph.symbolId())) {
+            StandardSymbolDefinition definition = registry.definition(glyph.symbolId());
+            if (definition == null) {
                 issues.add(new SymbolDiagnostic("CANONICAL_UNKNOWN_SYMBOL", "Symbol is not registered by Arcana: " + glyph.symbolId(), glyph.instanceId()));
                 continue;
             }
-            Set<String> allowed = registry.allowedParameters(glyph.symbolId());
+            if (!definition.instantiable()) {
+                issues.add(new SymbolDiagnostic("CANONICAL_ABSTRACT_SYMBOL",
+                        "This registry entry is a semantic category, not a concrete writable symbol.", glyph.instanceId()));
+                continue;
+            }
             for (String parameter : glyph.parameters().keySet()) {
-                if (!allowed.contains(parameter)) {
+                if (!definition.parameters().containsKey(parameter)) {
                     issues.add(new SymbolDiagnostic("CANONICAL_UNKNOWN_PARAMETER",
                             "Parameter is not defined by the standard symbol: " + parameter, glyph.instanceId()));
                 }
             }
-            if (glyph.symbolId().equals("arcana:repetition")) {
-                int count;
-                try { count = Integer.parseInt(glyph.parameters().getOrDefault("maxIterations", "")); }
-                catch (NumberFormatException ex) {
-                    issues.add(new SymbolDiagnostic("CANONICAL_REPETITION_UNBOUNDED",
-                            "The standard repetition symbol requires maxIterations.", glyph.instanceId()));
+            for (ParameterDefinition parameter : definition.parameters().values()) {
+                String value = glyph.parameters().get(parameter.id());
+                if (value == null) {
+                    if (parameter.required()) issues.add(new SymbolDiagnostic("CANONICAL_MISSING_PARAMETER",
+                            "Required parameter is missing: " + parameter.id(), glyph.instanceId()));
                     continue;
                 }
-                if (count < 1 || count > MAX_REPETITIONS) {
-                    issues.add(new SymbolDiagnostic("CANONICAL_REPETITION_LIMIT",
-                            "maxIterations is outside the supported bound.", glyph.instanceId()));
+                try {
+                    switch (parameter.type()) {
+                        case INTEGER -> {
+                            long parsed = Long.parseLong(value);
+                            if ((parameter.minimum() != null && parsed < parameter.minimum())
+                                    || (parameter.maximum() != null && parsed > parameter.maximum())) {
+                                issues.add(new SymbolDiagnostic("CANONICAL_PARAMETER_RANGE",
+                                        "Parameter is outside its allowed range: " + parameter.id(), glyph.instanceId()));
+                            }
+                        }
+                        case DECIMAL -> {
+                            double parsed = Double.parseDouble(value);
+                            if (!Double.isFinite(parsed)) throw new NumberFormatException();
+                        }
+                        case BOOLEAN -> {
+                            if (!value.equals("true") && !value.equals("false")) throw new IllegalArgumentException();
+                        }
+                        case IDENTIFIER -> requireIdentifier(value, "parameter value");
+                    }
+                } catch (RuntimeException ex) {
+                    issues.add(new SymbolDiagnostic("CANONICAL_PARAMETER_TYPE",
+                            "Parameter has an invalid value: " + parameter.id(), glyph.instanceId()));
                 }
             }
         }
         return new SymbolValidation(issues);
     }
+
     public enum GlyphKind { INVOCATION, TRANSFORM, BRANCH, NEXUS, REPETITION, WARD, SIGIL, CORE, MANIFESTATION }
     public enum HostKind { PAGE, ITEM, BLOCK, STRUCTURE_PART }
 
