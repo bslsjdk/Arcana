@@ -12,6 +12,8 @@ Arcana has three different layers. They must not be collapsed into one list of E
 
 The existing nine IDs (`invocation`, `transform`, `branch`, `nexus`, `repetition`, `ward`, `sigil`, `core`, and `manifestation`) are provisional semantic building blocks. They are **not** the finished alphabet, and their English names are not the glyphs. Some are broad structural categories that will need multiple concrete, narrowly defined symbols beneath them.
 
+See [Standard Symbol Catalog v0.1](STANDARD_SYMBOL_CATALOG.md) for the first concrete semantic inventory. The nine legacy names are non-instantiable family headings; actual constructions must reference concrete registered symbols such as control, data, perception, mana, reference, constraint, and effect symbols.
+
 ## 2. The canonical script is a real writing system
 
 Players must be able to author a working directly in the Arcana standard script without creating or loading a personal language definition.
