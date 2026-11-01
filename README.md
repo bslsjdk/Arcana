@@ -19,15 +19,24 @@ The long-term goal is not merely a collection of spells. Arcana aims to provide 
 ## Current implementation
 
 The first implementation branch establishes:
-- a NeoForge 1.21.1 / Java 21 project;
-- a bounded canonical-language lexer;
-- a recursive-descent parser for the initial spell syntax;
-- a versioned player-language keyword alias translator;
-- unit tests for parsing, translation equivalence, and malformed input.
 
-The v0.1 translator currently maps vocabulary aliases for canonical keywords. It does **not yet** support arbitrary grammar rewrites or word-order changes. Those are planned next; the engine must never guess missing grammar or meaning.
+- a NeoForge 1.21.1 / Java 21 project;
+- a bounded canonical-language lexer and recursive-descent parser;
+- a versioned player-language keyword alias translator;
+- a canonical AST with source spans and structured diagnostics;
+- a semantic validation pass for primitive types, sequential variable declarations, duplicate declarations, undefined references, and capability identifier format;
+- unit tests for parsing, translation equivalence, semantic validation, and malformed input.
+
+The v0.1 translator currently maps vocabulary aliases for canonical keywords. It does **not yet** support arbitrary grammar productions, word-order changes, inflection, or syntax templates. Those remain the next language-engine milestone. The semantic validator is static analysis only: it does not execute capabilities or mutate the Minecraft world.
+
+## Compilation pipeline
+
+`player source → language translation → canonical lexer/parser → canonical AST → semantic validation → capability resolution → bounded execution`
+
+Only the canonical AST may proceed beyond validation. Player-authored source and language definitions are untrusted input.
 
 See:
+
 - [Architecture](docs/ARCHITECTURE.md)
 - [Canonical grammar v0.1](docs/language/CANONICAL_GRAMMAR.md)
 
