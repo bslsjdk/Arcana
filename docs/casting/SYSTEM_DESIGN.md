@@ -1,6 +1,6 @@
 # Casting System Design
 
-Status: **first rules prototype implemented; Minecraft items and UI are not implemented yet**
+Status: **rank rules and basic casting-media item registration implemented; spellbook UI and functional casting are not implemented yet**
 
 This document defines the player-facing casting layer. The language engine describes a spell, but a player needs a learned spell and a suitable medium to invoke it in the world.
 
@@ -114,12 +114,12 @@ dev.arcana.casting.ArcanaCastingRules currently provides a loader-independent ru
 - compatible medium declarations;
 - structured rejection codes.
 
-It does **not** register Minecraft items, add inventory or GUI interactions, consume mana, implement learning, or execute spells. Those are separate implementation steps and must not be described as finished.
+It does **not** implement spell storage, inventory interaction, a spellbook GUI, mana consumption, learning, or spell execution. The grimoire, focus crystal, and scroll are currently registered as inert items in the Arcana creative tab.
 
 ## 9. Next vertical slice
 
 Implement the first playable loop in this order:
-1. Register a basic grimoire item that opens a spellbook screen.
+1. Implement a grimoire screen and persistent spellbook data model for the registered grimoire item.
 2. Add a simple spell collection data model and a few built-in test spells.
 3. Register a basic focus crystal as the first direct-casting medium.
 4. Add a server-authoritative cast request and validation using ArcanaCastingRules.
