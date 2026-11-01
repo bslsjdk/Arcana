@@ -132,7 +132,7 @@ public final class CastingSessionController {
 
     private void appendPayload(String addition) {
         if (addition == null || addition.isBlank()) return;
-        if (!payload.isEmpty() && !Character.isWhitespace(payload.charAt(payload.length() - 1))
+        if (payload.length() > 0 && !Character.isWhitespace(payload.charAt(payload.length() - 1))
                 && !Character.isWhitespace(addition.charAt(0))) {
             payload.append(' ');
         }
