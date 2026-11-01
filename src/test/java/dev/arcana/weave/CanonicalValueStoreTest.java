@@ -115,7 +115,8 @@ class CanonicalValueStoreTest {
                 store.writeOutput("position", "position",
                         new CanonicalValueStore.Vector3Value(1, 2, 3)).status());
         assertEquals(1, budget.snapshot().runtimeValues());
-        store.clearGlyph("position");
+        assertEquals(CanonicalValueStore.Status.CLEARED, store.clearGlyph("position").status());
+        assertEquals(CanonicalValueStore.Status.CLEARED, store.clearGlyph("position").status());
         assertTrue(store.snapshot().isEmpty());
         assertEquals(0, budget.snapshot().runtimeValues());
     }
