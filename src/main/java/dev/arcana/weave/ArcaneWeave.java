@@ -549,10 +549,18 @@ public final class ArcaneWeave {
                 issues.add(new SymbolDiagnostic("CANONICAL_REGION_INVALID_ENTRY",
                         "A control region must begin at a standard control/entry glyph.", region.id()));
             }
-            if (!connectionSet.contains(new CanonicalConnection(
-                    region.ownerGlyph(), region.ownerPort(), region.entryGlyph(), "flow"))) {
+            CanonicalConnection entryConnection = new CanonicalConnection(
+                    region.ownerGlyph(), region.ownerPort(), region.entryGlyph(), "flow");
+            if (!connectionSet.contains(entryConnection)) {
                 issues.add(new SymbolDiagnostic("CANONICAL_REGION_ENTRY_NOT_CONNECTED",
                         "The owner output must connect directly to the region entry flow input.", region.id()));
+            }
+            long ownerPortConnections = weave.connections().stream()
+                    .filter(connection -> connection.fromGlyph().equals(region.ownerGlyph())
+                            && connection.fromPort().equals(region.ownerPort())).count();
+            if (ownerPortConnections != 1) {
+                issues.add(new SymbolDiagnostic("CANONICAL_REGION_OWNER_PORT_FANOUT",
+                        "A control-region owner port must connect only to its declared entry.", region.id()));
             }
             PortDefinition exitPort = exitDefinition == null ? null : exitDefinition.outputs().get(region.exitPort());
             if (exitPort == null || exitPort.essence() != Essence.SIGNAL) {
@@ -560,23 +568,27 @@ public final class ArcaneWeave {
                         "A control region must exit through a registered SIGNAL output port.", region.id()));
                 continue;
             }
-            List<CanonicalConnection> externalSignalOutputs = weave.connections().stream()
+            List<CanonicalConnection> exitConnections = weave.connections().stream()
                     .filter(connection -> connection.fromGlyph().equals(region.exitGlyph())
-                            && connection.fromPort().equals(region.exitPort())
-                            && !directMembersByRegion.getOrDefault(region.id(), Set.of()).contains(connection.toGlyph()))
+                            && connection.fromPort().equals(region.exitPort()))
                     .toList();
             if (owner.symbolId().equals("arcana:control/repeat")) {
-                if (!externalSignalOutputs.isEmpty()) {
+                if (!exitConnections.isEmpty()) {
                     issues.add(new SymbolDiagnostic("CANONICAL_REPEAT_BODY_ESCAPES",
-                            "A repeat body exits through its bounded region boundary; it cannot jump outside the body.", region.id()));
+                            "A repeat body exit is captured by its bounded controller and cannot fan out.", region.id()));
                 }
             } else if (owner.symbolId().equals("arcana:control/branch")) {
-                if (externalSignalOutputs.size() != 1) {
+                if (exitConnections.size() != 1) {
                     issues.add(new SymbolDiagnostic("CANONICAL_BRANCH_ARM_EXIT",
                             "Each branch arm must exit through exactly one connection to a join.", region.id()));
                     continue;
                 }
-                CanonicalConnection exitConnection = externalSignalOutputs.getFirst();
+                CanonicalConnection exitConnection = exitConnections.getFirst();
+                if (directMembersByRegion.getOrDefault(region.id(), Set.of()).contains(exitConnection.toGlyph())) {
+                    issues.add(new SymbolDiagnostic("CANONICAL_BRANCH_ARM_EXIT_INTERNAL",
+                            "A branch arm exit must leave its region and enter a join.", region.id()));
+                    continue;
+                }
                 CanonicalGlyph target = glyphsById.get(exitConnection.toGlyph());
                 if (target == null || !target.symbolId().equals("arcana:control/join")
                         || !(exitConnection.toPort().equals("left") || exitConnection.toPort().equals("right"))) {
