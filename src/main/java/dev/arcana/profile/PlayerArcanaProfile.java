@@ -1,22 +1,18 @@
 package dev.arcana.profile;
 
-import dev.arcana.casting.CastingTriggerRecognizer;
-import dev.arcana.language.ArcanaLanguage;
-
 import java.util.Objects;
 
 /**
- * World-scoped player configuration for Arcana's language converter and
- * ordinary voice-command trigger phrases.
+ * Immutable world-scoped profile for one player.
  *
- * This deliberately contains no learned-knowledge state. A language converter
- * is configuration data and is not proof that a player understands a language.
+ * Converter rules are configuration, not learned knowledge. Knowledge and
+ * research progression must be stored by a separate system and must not be
+ * inferred from the presence of this profile.
  */
 public record PlayerArcanaProfile(
         int schemaVersion,
         ArcanaLanguage.LanguageDefinition language,
         CastingTriggerRecognizer.TriggerProfile triggers) {
-
     public static final int CURRENT_SCHEMA_VERSION = 1;
 
     public PlayerArcanaProfile {
@@ -31,6 +27,16 @@ public record PlayerArcanaProfile(
         if (language.phraseRules().size() > 256) {
             throw new IllegalArgumentException("A player language may define at most 256 phrase rules.");
         }
+        language.keywordAliases().forEach((alias, replacement) -> {
+            if (alias.length() > 128 || replacement.length() > 32 || alias.isBlank()) {
+                throw new IllegalArgumentException("Invalid keyword alias length.");
+            }
+        });
+        language.phraseRules().forEach(rule -> {
+            if (rule.sourcePhrase().length() > 256 || rule.canonicalReplacement().length() > 4_096) {
+                throw new IllegalArgumentException("Phrase rule exceeds its size limit.");
+            }
+        });
     }
 
     public PlayerArcanaProfile(
