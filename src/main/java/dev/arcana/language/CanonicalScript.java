@@ -182,14 +182,14 @@ public final class CanonicalScript {
             try {
                 if (declaration.charAt(0) == '@') {
                     java.util.regex.Matcher matcher = java.util.regex.Pattern.compile(
-                            "@([a-zA-Z0-9_.-]+)\\.([a-zA-Z][a-zA-Z0-9_]*)>([a-zA-Z0-9_.-]+)\\.([a-zA-Z][a-zA-Z0-9_]*)")
+                            "@([a-zA-Z0-9][a-zA-Z0-9_.-]*)\\.([a-zA-Z][a-zA-Z0-9_]*)>([a-zA-Z0-9][a-zA-Z0-9_.-]*)\\.([a-zA-Z][a-zA-Z0-9_]*)")
                             .matcher(declaration);
                     if (!matcher.matches()) throw new IllegalArgumentException("SCRIPT_INVALID_CONNECTION");
                     connections.add(new dev.arcana.weave.ArcaneWeave.CanonicalConnection(
                             matcher.group(1), matcher.group(2), matcher.group(3), matcher.group(4)));
                 } else if (declaration.charAt(0) == '^') {
                     java.util.regex.Matcher matcher = java.util.regex.Pattern.compile(
-                            "\\^([a-zA-Z][a-zA-Z0-9_.-]*)\\(([a-zA-Z][a-zA-Z0-9_.-]*)\\.([a-zA-Z][a-zA-Z0-9_]*)\\)\\[([a-zA-Z][a-zA-Z0-9_.-]*)>([a-zA-Z][a-zA-Z0-9_.-]*)\\]\\(([a-zA-Z0-9_.,-]+)\\)@(-|[a-zA-Z][a-zA-Z0-9_.-]*)")
+                            "\\^([a-zA-Z0-9][a-zA-Z0-9_.-]*)\\(([a-zA-Z0-9][a-zA-Z0-9_.-]*)\\.([a-zA-Z][a-zA-Z0-9_]*)\\)\\[([a-zA-Z0-9][a-zA-Z0-9_.-]*)>([a-zA-Z0-9][a-zA-Z0-9_.-]*)\\]\\(([a-zA-Z0-9_.,-]+)\\)@(-|[a-zA-Z0-9][a-zA-Z0-9_.-]*)")
                             .matcher(declaration);
                     if (!matcher.matches()) throw new IllegalArgumentException("SCRIPT_INVALID_REGION");
                     List<String> members = java.util.Arrays.stream(matcher.group(6).split(","))
@@ -205,7 +205,7 @@ public final class CanonicalScript {
                     if (symbolId == null) throw new IllegalArgumentException("SCRIPT_UNKNOWN_GLYPH");
                     String tail = declaration.substring(glyphWidth).trim();
                     java.util.regex.Matcher matcher = java.util.regex.Pattern.compile(
-                            "#([a-zA-Z][a-zA-Z0-9_.-]*)(?:\\s*\\{(.*)\\})?")
+                            "#([a-zA-Z0-9][a-zA-Z0-9_.-]*)(?:\\s*\\{(.*)\\})?")
                             .matcher(tail);
                     if (!matcher.matches()) throw new IllegalArgumentException("SCRIPT_INVALID_GLYPH_DECLARATION");
                     String instanceId = matcher.group(1);
