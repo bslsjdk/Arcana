@@ -79,6 +79,7 @@ public final class CanonicalValueStore {
     public enum Status {
         STORED,
         REPLACED,
+        CLEARED,
         RESOLVED,
         UNKNOWN_GLYPH,
         UNKNOWN_SYMBOL,
@@ -100,7 +101,8 @@ public final class CanonicalValueStore {
                 throw new IllegalArgumentException("Failed results cannot expose a value.");
         }
         public boolean successful() {
-            return status == Status.RESOLVED || status == Status.STORED || status == Status.REPLACED;
+            return status == Status.RESOLVED || status == Status.STORED || status == Status.REPLACED
+                    || status == Status.CLEARED;
         }
     }
 
@@ -168,12 +170,12 @@ public final class CanonicalValueStore {
         if (glyphId == null) return result(Status.INVALID_REQUEST, "Glyph id is required.");
         int removed = (int) values.keySet().stream()
                 .filter(address -> address.glyphId().equals(glyphId)).count();
-        if (removed == 0) return new Result(Status.REPLACED, null, null);
+        if (removed == 0) return new Result(Status.CLEARED, null, null);
         CanonicalExecutionBudget.Admission admission = budget.releaseRuntimeValues(removed);
         if (admission != CanonicalExecutionBudget.Admission.ACCEPTED)
             return result(Status.INVALID_REQUEST, "Value-store and budget accounting are inconsistent.");
         values.keySet().removeIf(address -> address.glyphId().equals(glyphId));
-        return new Result(Status.REPLACED, null, null);
+        return new Result(Status.CLEARED, null, null);
     }
 
     public Map<PortAddress, RuntimeValue> snapshot() { return Map.copyOf(values); }
