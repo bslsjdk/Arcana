@@ -147,7 +147,11 @@ public final class ArcaneWeave {
                     ports("left", Essence.NUMBER, "right", Essence.NUMBER),
                     ports("result", Essence.NUMBER), Map.of(),
                     ControlFlow.DATA, 1, null, true));
-            add(defs, symbol("arcana:data/compare", "data",
+            add(defs, symbol("arcana:data/equal", "data",
+                    ports("left", Essence.NUMBER, "right", Essence.NUMBER),
+                    ports("result", Essence.BOOLEAN), Map.of(),
+                    ControlFlow.DATA, 1, null, true));
+            add(defs, symbol("arcana:data/less_than", "data",
                     ports("left", Essence.NUMBER, "right", Essence.NUMBER),
                     ports("result", Essence.BOOLEAN), Map.of(),
                     ControlFlow.DATA, 1, null, true));
