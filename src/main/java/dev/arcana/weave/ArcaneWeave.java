@@ -103,14 +103,20 @@ public final class ArcaneWeave {
     }
 
     public record CanonicalRegion(String id, String ownerGlyph, String ownerPort,
-                                  String entryGlyph, String exitGlyph,
+                                  String entryGlyph, String exitGlyph, String exitPort,
                                   List<String> memberGlyphs, String parentRegionId) {
+        public CanonicalRegion(String id, String ownerGlyph, String ownerPort,
+                               String entryGlyph, String exitGlyph,
+                               List<String> memberGlyphs, String parentRegionId) {
+            this(id, ownerGlyph, ownerPort, entryGlyph, exitGlyph, "flow", memberGlyphs, parentRegionId);
+        }
         public CanonicalRegion {
             requireIdentifier(id, "region id");
             requireIdentifier(ownerGlyph, "region owner glyph");
             requireIdentifier(ownerPort, "region owner port");
             requireIdentifier(entryGlyph, "region entry glyph");
             requireIdentifier(exitGlyph, "region exit glyph");
+            requireIdentifier(exitPort, "region exit port");
             memberGlyphs = List.copyOf(Objects.requireNonNull(memberGlyphs, "member glyphs"));
             if (memberGlyphs.isEmpty() || memberGlyphs.size() > MAX_GLYPHS)
                 throw new IllegalArgumentException("A control region must contain 1.." + MAX_GLYPHS + " glyphs.");
@@ -166,7 +172,8 @@ public final class ArcaneWeave {
             }
 
             add(defs, symbol("arcana:control/entry", "control",
-                    Map.of(), ports("flow", Essence.SIGNAL), Map.of(),
+                    Map.of("flow", new PortDefinition("flow", Essence.SIGNAL, false)),
+                    ports("flow", Essence.SIGNAL), Map.of(),
                     ControlFlow.ENTRY, 1, null, true));
             add(defs, symbol("arcana:control/branch", "control",
                     ports("condition", Essence.BOOLEAN, "flow", Essence.SIGNAL),
@@ -523,6 +530,99 @@ public final class ArcaneWeave {
                 if (region.id().equals(parent.id())) {
                     issues.add(new SymbolDiagnostic("CANONICAL_REGION_PARENT_CYCLE",
                             "A control region cannot be its own parent.", region.id()));
+                }
+            }
+        }
+
+        Set<CanonicalConnection> connectionSet = new HashSet<>(weave.connections());
+        Map<String, String> branchJoinByOwner = new HashMap<>();
+        Map<String, Set<String>> branchJoinPorts = new HashMap<>();
+        for (CanonicalRegion region : regionsById.values()) {
+            CanonicalGlyph owner = glyphsById.get(region.ownerGlyph());
+            CanonicalGlyph entry = glyphsById.get(region.entryGlyph());
+            CanonicalGlyph exit = glyphsById.get(region.exitGlyph());
+            if (owner == null || entry == null || exit == null) continue;
+            StandardSymbolDefinition entryDefinition = registry.definition(entry.symbolId());
+            StandardSymbolDefinition exitDefinition = registry.definition(exit.symbolId());
+            if (!"arcana:control/entry".equals(entry.symbolId())
+                    || entryDefinition == null || !entryDefinition.inputs().containsKey("flow")) {
+                issues.add(new SymbolDiagnostic("CANONICAL_REGION_INVALID_ENTRY",
+                        "A control region must begin at a standard control/entry glyph.", region.id()));
+            }
+            if (!connectionSet.contains(new CanonicalConnection(
+                    region.ownerGlyph(), region.ownerPort(), region.entryGlyph(), "flow"))) {
+                issues.add(new SymbolDiagnostic("CANONICAL_REGION_ENTRY_NOT_CONNECTED",
+                        "The owner output must connect directly to the region entry flow input.", region.id()));
+            }
+            PortDefinition exitPort = exitDefinition == null ? null : exitDefinition.outputs().get(region.exitPort());
+            if (exitPort == null || exitPort.essence() != Essence.SIGNAL) {
+                issues.add(new SymbolDiagnostic("CANONICAL_REGION_INVALID_EXIT",
+                        "A control region must exit through a registered SIGNAL output port.", region.id()));
+                continue;
+            }
+            List<CanonicalConnection> externalSignalOutputs = weave.connections().stream()
+                    .filter(connection -> connection.fromGlyph().equals(region.exitGlyph())
+                            && connection.fromPort().equals(region.exitPort())
+                            && !directMembersByRegion.getOrDefault(region.id(), Set.of()).contains(connection.toGlyph()))
+                    .toList();
+            if (owner.symbolId().equals("arcana:control/repeat")) {
+                if (!externalSignalOutputs.isEmpty()) {
+                    issues.add(new SymbolDiagnostic("CANONICAL_REPEAT_BODY_ESCAPES",
+                            "A repeat body exits through its bounded region boundary; it cannot jump outside the body.", region.id()));
+                }
+            } else if (owner.symbolId().equals("arcana:control/branch")) {
+                if (externalSignalOutputs.size() != 1) {
+                    issues.add(new SymbolDiagnostic("CANONICAL_BRANCH_ARM_EXIT",
+                            "Each branch arm must exit through exactly one connection to a join.", region.id()));
+                    continue;
+                }
+                CanonicalConnection exitConnection = externalSignalOutputs.getFirst();
+                CanonicalGlyph target = glyphsById.get(exitConnection.toGlyph());
+                if (target == null || !target.symbolId().equals("arcana:control/join")
+                        || !(exitConnection.toPort().equals("left") || exitConnection.toPort().equals("right"))) {
+                    issues.add(new SymbolDiagnostic("CANONICAL_BRANCH_ARM_NOT_JOINED",
+                            "A branch arm must connect its exit to a standard join input.", region.id()));
+                    continue;
+                }
+                String priorJoin = branchJoinByOwner.putIfAbsent(owner.instanceId(), target.instanceId());
+                if (priorJoin != null && !priorJoin.equals(target.instanceId())) {
+                    issues.add(new SymbolDiagnostic("CANONICAL_BRANCH_JOIN_MISMATCH",
+                            "Both branch arms must converge on the same join glyph.", owner.instanceId()));
+                }
+                if (!branchJoinPorts.computeIfAbsent(owner.instanceId(), ignored -> new HashSet<>())
+                        .add(exitConnection.toPort())) {
+                    issues.add(new SymbolDiagnostic("CANONICAL_BRANCH_JOIN_INPUT_REUSED",
+                            "Branch arms must use distinct join inputs.", owner.instanceId()));
+                }
+            }
+        }
+
+        // Signal connections may cross a region boundary only at its declared entry or exit.
+        for (CanonicalRegion region : regionsById.values()) {
+            Set<String> members = directMembersByRegion.getOrDefault(region.id(), Set.of());
+            for (CanonicalConnection connection : weave.connections()) {
+                boolean fromInside = members.contains(connection.fromGlyph());
+                boolean toInside = members.contains(connection.toGlyph());
+                if (fromInside == toInside) continue;
+                boolean declaredEntry = !fromInside
+                        && connection.fromGlyph().equals(region.ownerGlyph())
+                        && connection.fromPort().equals(region.ownerPort())
+                        && connection.toGlyph().equals(region.entryGlyph())
+                        && connection.toPort().equals("flow");
+                boolean declaredExit = fromInside
+                        && connection.fromGlyph().equals(region.exitGlyph())
+                        && connection.fromPort().equals(region.exitPort())
+                        && connection.toGlyph().equals(branchJoinByOwner.get(region.ownerGlyph()));
+                if (declaredEntry || declaredExit) continue;
+                CanonicalGlyph from = glyphsById.get(connection.fromGlyph());
+                CanonicalGlyph to = glyphsById.get(connection.toGlyph());
+                StandardSymbolDefinition fromDef = from == null ? null : registry.definition(from.symbolId());
+                StandardSymbolDefinition toDef = to == null ? null : registry.definition(to.symbolId());
+                PortDefinition out = fromDef == null ? null : fromDef.outputs().get(connection.fromPort());
+                PortDefinition in = toDef == null ? null : toDef.inputs().get(connection.toPort());
+                if (out != null && in != null && out.essence() == Essence.SIGNAL && in.essence() == Essence.SIGNAL) {
+                    issues.add(new SymbolDiagnostic("CANONICAL_REGION_CONTROL_FLOW_ESCAPE",
+                            "Control-flow connections cannot enter or leave a region except through its declared boundaries.", region.id()));
                 }
             }
         }
