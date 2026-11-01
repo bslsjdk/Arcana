@@ -154,8 +154,9 @@ public final class ArcanaLanguage {
         public PhraseRule {
             Objects.requireNonNull(sourcePhrase);
             Objects.requireNonNull(canonicalReplacement);
-            if (sourcePhrase.isBlank() || canonicalReplacement.isBlank()) {
-                throw new IllegalArgumentException("Phrase rules cannot be blank.");
+            if (sourcePhrase.isBlank() || sourcePhrase.length() > 256
+                    || canonicalReplacement.isBlank() || canonicalReplacement.length() > 4_096) {
+                throw new IllegalArgumentException("Phrase rules must fit their configured size limits.");
             }
             List<String> tokens = tokenPattern(sourcePhrase);
             if (tokens.isEmpty() || tokens.size() > 64) {
@@ -183,14 +184,21 @@ public final class ArcanaLanguage {
             if (phraseRules.size() > 256) {
                 throw new IllegalArgumentException("A language may define at most 256 phrase rules.");
             }
+            if (keywordAliases.size() > 512) {
+                throw new IllegalArgumentException("A language may define at most 512 keyword aliases.");
+            }
             if (!id.matches("[a-z0-9_.-]+:[a-z0-9_./-]+")) {
                 throw new IllegalArgumentException("Language id must be namespaced.");
             }
             if (version < 1) throw new IllegalArgumentException("Language version must be positive.");
             Map<String, String> normalized = new LinkedHashMap<>();
             keywordAliases.forEach((alias, canonical) -> {
+                Objects.requireNonNull(alias, "alias");
+                Objects.requireNonNull(canonical, "canonical alias target");
+                if (alias.isBlank() || alias.length() > 128) {
+                    throw new IllegalArgumentException("Aliases must contain 1 to 128 characters.");
+                }
                 String key = alias.toLowerCase(Locale.ROOT);
-                if (key.isBlank()) throw new IllegalArgumentException("Aliases cannot be blank.");
                 if (!CANONICAL.contains(canonical)) {
                     throw new IllegalArgumentException("Unsupported canonical keyword: " + canonical);
                 }
