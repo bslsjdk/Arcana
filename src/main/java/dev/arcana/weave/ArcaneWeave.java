@@ -1,0 +1,977 @@
+package dev.arcana.weave;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+
+/**
+ * Loader-independent domain model for player-authored magical weaves.
+ *
+ * The model deliberately uses magical authoring vocabulary. Its graph is a
+ * logical construction and is not bound to a book, item, block, or ritual circle.
+ * Hosts and installations are separate physical concerns.
+ */
+public final class ArcaneWeave {
+    public static final int VERSION = 1;
+    public static final int MAX_GLYPHS = 512;
+    public static final int MAX_VEINS = 2_048;
+    public static final int MAX_REPETITIONS = 1_024;
+
+    private ArcaneWeave() { }
+
+    public enum Essence {
+        MANA, SIGNAL, BOOLEAN, NUMBER, TEXT, VECTOR3, ENTITY_REF, BLOCK_REF
+    }
+
+    public enum ControlFlow { ENTRY, LINEAR, BRANCH, JOIN, LOOP, TERMINAL, DATA }
+    public enum ParameterType { INTEGER, DECIMAL, BOOLEAN, IDENTIFIER }
+
+    public record PortDefinition(String id, Essence essence, boolean required) {
+        public PortDefinition {
+            requireIdentifier(id, "port id");
+            Objects.requireNonNull(essence, "essence");
+        }
+    }
+
+    public record ParameterDefinition(String id, ParameterType type, boolean required,
+                                      Long minimum, Long maximum) {
+        public ParameterDefinition {
+            requireIdentifier(id, "parameter id");
+            Objects.requireNonNull(type, "parameter type");
+            if (minimum != null && maximum != null && minimum > maximum)
+                throw new IllegalArgumentException("Parameter minimum exceeds maximum.");
+            if (type != ParameterType.INTEGER && (minimum != null || maximum != null))
+                throw new IllegalArgumentException("Only integer parameters may declare integer bounds.");
+        }
+    }
+
+    /**
+     * Arcana-owned semantic contract. Ports and parameter schemas come only
+     * from this definition; player-authored glyph instances cannot override them.
+     */
+    public record StandardSymbolDefinition(
+            String symbolId,
+            String family,
+            Map<String, PortDefinition> inputs,
+            Map<String, PortDefinition> outputs,
+            Map<String, ParameterDefinition> parameters,
+            ControlFlow controlFlow,
+            int complexityWeight,
+            String capabilityId,
+            boolean instantiable) {
+        public StandardSymbolDefinition {
+            requireNamespacedId(symbolId, "standard symbol id");
+            requireIdentifier(family, "symbol family");
+            inputs = StandardSymbolRegistry.immutablePorts(inputs, "inputs");
+            outputs = StandardSymbolRegistry.immutablePorts(outputs, "outputs");
+            parameters = Map.copyOf(Objects.requireNonNull(parameters, "parameters"));
+            parameters.forEach((id, definition) -> {
+                requireIdentifier(id, "parameter key");
+                if (!id.equals(definition.id())) throw new IllegalArgumentException("Parameter key mismatch.");
+            });
+            Objects.requireNonNull(controlFlow, "control flow");
+            if (complexityWeight < 1 || complexityWeight > 10_000)
+                throw new IllegalArgumentException("Invalid symbol complexity weight.");
+            if (capabilityId != null) requireNamespacedId(capabilityId, "capability id");
+            if (!instantiable && capabilityId != null)
+                throw new IllegalArgumentException("Abstract symbol categories cannot map to capabilities.");
+        }
+    }
+
+    /** Canonical symbol reference used by the registry-backed authoring model. */
+    public record CanonicalGlyph(String instanceId, String symbolId, Map<String, String> parameters) {
+        public CanonicalGlyph {
+            requireIdentifier(instanceId, "glyph instance id");
+            requireNamespacedId(symbolId, "standard symbol id");
+            parameters = Map.copyOf(Objects.requireNonNull(parameters, "parameters"));
+            if (parameters.size() > 32) throw new IllegalArgumentException("Too many symbol parameters.");
+        }
+    }
+
+    public record CanonicalConnection(String fromGlyph, String fromPort, String toGlyph, String toPort) {
+        public CanonicalConnection {
+            requireIdentifier(fromGlyph, "source glyph");
+            requireIdentifier(fromPort, "source port");
+            requireIdentifier(toGlyph, "target glyph");
+            requireIdentifier(toPort, "target port");
+        }
+    }
+
+    public record CanonicalRegion(String id, String ownerGlyph, String ownerPort,
+                                  String entryGlyph, String exitGlyph, String exitPort,
+                                  List<String> memberGlyphs, String parentRegionId) {
+        public CanonicalRegion(String id, String ownerGlyph, String ownerPort,
+                               String entryGlyph, String exitGlyph,
+                               List<String> memberGlyphs, String parentRegionId) {
+            this(id, ownerGlyph, ownerPort, entryGlyph, exitGlyph, "flow", memberGlyphs, parentRegionId);
+        }
+        public CanonicalRegion {
+            requireIdentifier(id, "region id");
+            requireIdentifier(ownerGlyph, "region owner glyph");
+            requireIdentifier(ownerPort, "region owner port");
+            requireIdentifier(entryGlyph, "region entry glyph");
+            requireIdentifier(exitGlyph, "region exit glyph");
+            requireIdentifier(exitPort, "region exit port");
+            memberGlyphs = List.copyOf(Objects.requireNonNull(memberGlyphs, "member glyphs"));
+            if (memberGlyphs.isEmpty() || memberGlyphs.size() > MAX_GLYPHS)
+                throw new IllegalArgumentException("A control region must contain 1.." + MAX_GLYPHS + " glyphs.");
+            memberGlyphs.forEach(member -> requireIdentifier(member, "region member glyph"));
+            if (parentRegionId != null) requireIdentifier(parentRegionId, "parent region id");
+        }
+    }
+
+    public record CanonicalWeave(String id, int version, List<CanonicalGlyph> glyphs,
+                                 List<CanonicalConnection> connections, List<CanonicalRegion> regions) {
+        public CanonicalWeave(String id, int version, List<CanonicalGlyph> glyphs) {
+            this(id, version, glyphs, List.of(), List.of());
+        }
+        public CanonicalWeave(String id, int version, List<CanonicalGlyph> glyphs,
+                              List<CanonicalConnection> connections) {
+            this(id, version, glyphs, connections, List.of());
+        }
+        public CanonicalWeave {
+            requireNamespacedId(id, "weave id");
+            if (version < 1) throw new IllegalArgumentException("Weave version must be positive.");
+            glyphs = List.copyOf(Objects.requireNonNull(glyphs, "glyphs"));
+            connections = List.copyOf(Objects.requireNonNull(connections, "connections"));
+            regions = List.copyOf(Objects.requireNonNull(regions, "regions"));
+            if (glyphs.size() > MAX_GLYPHS) throw new IllegalArgumentException("Weave exceeds the glyph limit.");
+            if (connections.size() > MAX_VEINS) throw new IllegalArgumentException("Weave exceeds the connection limit.");
+            if (regions.size() > 256) throw new IllegalArgumentException("Weave exceeds the control-region limit.");
+        }
+    }
+
+    public record SymbolDiagnostic(String code, String message, String glyphId) { }
+
+    public record SymbolValidation(List<SymbolDiagnostic> diagnostics) {
+        public SymbolValidation { diagnostics = List.copyOf(diagnostics); }
+        public boolean valid() { return diagnostics.isEmpty(); }
+    }
+
+    /** Immutable Arcana-owned registry. No player-supplied definition can enter it. */
+    public static final class StandardSymbolRegistry {
+        private final Map<String, StandardSymbolDefinition> definitions;
+
+        private StandardSymbolRegistry(Map<String, StandardSymbolDefinition> definitions) {
+            this.definitions = Map.copyOf(new LinkedHashMap<>(definitions));
+        }
+
+        public static StandardSymbolRegistry builtins() {
+            Map<String, StandardSymbolDefinition> defs = new LinkedHashMap<>();
+
+            // Legacy semantic headings remain discoverable but cannot be instantiated.
+            for (String id : List.of("invocation", "transform", "branch", "nexus",
+                    "repetition", "ward", "sigil", "core", "manifestation")) {
+                add(defs, symbol("arcana:" + id, "category", Map.of(), Map.of(), Map.of(),
+                        ControlFlow.DATA, 1, null, false));
+            }
+
+            add(defs, symbol("arcana:control/entry", "control",
+                    Map.of("flow", new PortDefinition("flow", Essence.SIGNAL, false)),
+                    ports("flow", Essence.SIGNAL), Map.of(),
+                    ControlFlow.ENTRY, 1, null, true));
+            add(defs, symbol("arcana:control/branch", "control",
+                    ports("condition", Essence.BOOLEAN, "flow", Essence.SIGNAL),
+                    ports("whenTrue", Essence.SIGNAL, "whenFalse", Essence.SIGNAL), Map.of(),
+                    ControlFlow.BRANCH, 3, null, true));
+            add(defs, symbol("arcana:control/join", "control",
+                    ports("left", Essence.SIGNAL, "right", Essence.SIGNAL),
+                    ports("flow", Essence.SIGNAL), Map.of(),
+                    ControlFlow.JOIN, 2, null, true));
+            add(defs, symbol("arcana:control/repeat", "control",
+                    ports("flow", Essence.SIGNAL), ports("body", Essence.SIGNAL, "completed", Essence.SIGNAL),
+                    params(integerParameter("maxIterations", true, 1, MAX_REPETITIONS)),
+                    ControlFlow.LOOP, 4, null, true));
+
+            add(defs, symbol("arcana:data/add", "data",
+                    ports("left", Essence.NUMBER, "right", Essence.NUMBER),
+                    ports("result", Essence.NUMBER), Map.of(),
+                    ControlFlow.DATA, 1, null, true));
+            add(defs, symbol("arcana:data/equal", "data",
+                    ports("left", Essence.NUMBER, "right", Essence.NUMBER),
+                    ports("result", Essence.BOOLEAN), Map.of(),
+                    ControlFlow.DATA, 1, null, true));
+            add(defs, symbol("arcana:data/less_than", "data",
+                    ports("left", Essence.NUMBER, "right", Essence.NUMBER),
+                    ports("result", Essence.BOOLEAN), Map.of(),
+                    ControlFlow.DATA, 1, null, true));
+
+            add(defs, symbol("arcana:sense/block", "perception",
+                    ports("position", Essence.VECTOR3), ports("block", Essence.BLOCK_REF), Map.of(),
+                    ControlFlow.DATA, 2, "arcana:world/read_block", true));
+            add(defs, symbol("arcana:sense/entity", "perception",
+                    ports("position", Essence.VECTOR3, "radius", Essence.NUMBER),
+                    ports("entity", Essence.ENTITY_REF), Map.of(),
+                    ControlFlow.DATA, 3, "arcana:world/query_entities", true));
+            add(defs, symbol("arcana:sense/light_level", "perception",
+                    ports("position", Essence.VECTOR3), ports("level", Essence.NUMBER), Map.of(),
+                    ControlFlow.DATA, 2, "arcana:world/read_light", true));
+
+            add(defs, symbol("arcana:mana/absorb", "mana",
+                    ports("source", Essence.SIGNAL), ports("mana", Essence.MANA), Map.of(),
+                    ControlFlow.LINEAR, 2, "arcana:mana/absorb", true));
+            add(defs, symbol("arcana:mana/store", "mana",
+                    ports("mana", Essence.MANA, "flow", Essence.SIGNAL),
+                    ports("stored", Essence.SIGNAL), Map.of(),
+                    ControlFlow.LINEAR, 2, "arcana:mana/store", true));
+            add(defs, symbol("arcana:mana/release", "mana",
+                    ports("stored", Essence.SIGNAL), ports("mana", Essence.MANA), Map.of(),
+                    ControlFlow.LINEAR, 2, "arcana:mana/release", true));
+
+            add(defs, symbol("arcana:reference/position", "reference",
+                    Map.of(), ports("position", Essence.VECTOR3),
+                    params(decimalParameter("x"), decimalParameter("y"), decimalParameter("z")),
+                    ControlFlow.DATA, 1, null, true));
+            add(defs, symbol("arcana:reference/number", "reference",
+                    Map.of(), ports("number", Essence.NUMBER),
+                    params(decimalParameter("value")),
+                    ControlFlow.DATA, 1, null, true));
+            add(defs, symbol("arcana:reference/entity", "reference",
+                    Map.of(), ports("entity", Essence.ENTITY_REF),
+                    params(identifierParameter("selector")), ControlFlow.DATA, 1, null, true));
+
+            add(defs, symbol("arcana:constraint/ward", "constraint",
+                    ports("area", Essence.VECTOR3, "flow", Essence.SIGNAL),
+                    ports("permitted", Essence.SIGNAL), Map.of(),
+                    ControlFlow.LINEAR, 4, "arcana:world/ward_check", true));
+            add(defs, symbol("arcana:effect/light", "effect",
+                    ports("position", Essence.VECTOR3, "level", Essence.NUMBER, "flow", Essence.SIGNAL),
+                    ports("complete", Essence.SIGNAL), Map.of(),
+                    ControlFlow.LINEAR, 3, "arcana:world/set_light", true));
+
+            return new StandardSymbolRegistry(defs);
+        }
+
+        public boolean contains(String symbolId) { return definitions.containsKey(symbolId); }
+        public boolean isInstantiable(String symbolId) {
+            StandardSymbolDefinition definition = definitions.get(symbolId);
+            return definition != null && definition.instantiable();
+        }
+        public StandardSymbolDefinition definition(String symbolId) { return definitions.get(symbolId); }
+        public Set<String> allowedParameters(String symbolId) {
+            StandardSymbolDefinition definition = definitions.get(symbolId);
+            return definition == null ? Set.of() : definition.parameters().keySet();
+        }
+        public Set<String> symbolIds() { return definitions.keySet(); }
+
+        private static void add(Map<String, StandardSymbolDefinition> defs, StandardSymbolDefinition definition) {
+            if (defs.putIfAbsent(definition.symbolId(), definition) != null)
+                throw new IllegalStateException("Duplicate built-in symbol: " + definition.symbolId());
+        }
+        private static StandardSymbolDefinition symbol(String id, String family,
+                Map<String, PortDefinition> inputs, Map<String, PortDefinition> outputs,
+                Map<String, ParameterDefinition> parameters, ControlFlow flow,
+                int weight, String capability, boolean instantiable) {
+            return new StandardSymbolDefinition(id, family, inputs, outputs, parameters,
+                    flow, weight, capability, instantiable);
+        }
+        private static Map<String, PortDefinition> ports(Object... values) {
+            if (values.length % 2 != 0) throw new IllegalArgumentException("Port declarations need id/type pairs.");
+            Map<String, PortDefinition> result = new LinkedHashMap<>();
+            for (int i = 0; i < values.length; i += 2) {
+                String id = (String) values[i];
+                Essence essence = (Essence) values[i + 1];
+                result.put(id, new PortDefinition(id, essence, true));
+            }
+            return Map.copyOf(result);
+        }
+        private static Map<String, PortDefinition> immutablePorts(Map<String, PortDefinition> values, String label) {
+            Objects.requireNonNull(values, label);
+            Map<String, PortDefinition> copy = new LinkedHashMap<>();
+            values.forEach((id, port) -> {
+                requireIdentifier(id, label + " port id");
+                if (!id.equals(port.id())) throw new IllegalArgumentException("Port key mismatch.");
+                copy.put(id, port);
+            });
+            return Map.copyOf(copy);
+        }
+        private static ParameterDefinition integerParameter(String id, boolean required, long min, long max) {
+            return new ParameterDefinition(id, ParameterType.INTEGER, required, min, max);
+        }
+        private static ParameterDefinition decimalParameter(String id) {
+            return new ParameterDefinition(id, ParameterType.DECIMAL, true, null, null);
+        }
+        private static ParameterDefinition identifierParameter(String id) {
+            return new ParameterDefinition(id, ParameterType.IDENTIFIER, true, null, null);
+        }
+        private static Map<String, ParameterDefinition> params(ParameterDefinition... values) {
+            Map<String, ParameterDefinition> result = new LinkedHashMap<>();
+            for (ParameterDefinition value : values) result.put(value.id(), value);
+            return Map.copyOf(result);
+        }
+    }
+
+    public static SymbolValidation validateCanonical(CanonicalWeave weave, StandardSymbolRegistry registry) {
+        Objects.requireNonNull(weave, "weave");
+        Objects.requireNonNull(registry, "registry");
+        List<SymbolDiagnostic> issues = new ArrayList<>();
+        if (weave.glyphs().isEmpty()) {
+            issues.add(new SymbolDiagnostic("CANONICAL_WEAVE_EMPTY", "A canonical weave must contain at least one standard symbol.", null));
+        }
+        Set<String> instances = new HashSet<>();
+        for (CanonicalGlyph glyph : weave.glyphs()) {
+            if (!instances.add(glyph.instanceId())) {
+                issues.add(new SymbolDiagnostic("CANONICAL_DUPLICATE_INSTANCE", "Duplicate glyph instance id.", glyph.instanceId()));
+            }
+            StandardSymbolDefinition definition = registry.definition(glyph.symbolId());
+            if (definition == null) {
+                issues.add(new SymbolDiagnostic("CANONICAL_UNKNOWN_SYMBOL", "Symbol is not registered by Arcana: " + glyph.symbolId(), glyph.instanceId()));
+                continue;
+            }
+            if (!definition.instantiable()) {
+                issues.add(new SymbolDiagnostic("CANONICAL_ABSTRACT_SYMBOL",
+                        "This registry entry is a semantic category, not a concrete writable symbol.", glyph.instanceId()));
+                continue;
+            }
+            for (String parameter : glyph.parameters().keySet()) {
+                if (!definition.parameters().containsKey(parameter)) {
+                    issues.add(new SymbolDiagnostic("CANONICAL_UNKNOWN_PARAMETER",
+                            "Parameter is not defined by the standard symbol: " + parameter, glyph.instanceId()));
+                }
+            }
+            for (ParameterDefinition parameter : definition.parameters().values()) {
+                String value = glyph.parameters().get(parameter.id());
+                if (value == null) {
+                    if (parameter.required()) issues.add(new SymbolDiagnostic("CANONICAL_MISSING_PARAMETER",
+                            "Required parameter is missing: " + parameter.id(), glyph.instanceId()));
+                    continue;
+                }
+                try {
+                    switch (parameter.type()) {
+                        case INTEGER -> {
+                            long parsed = Long.parseLong(value);
+                            if ((parameter.minimum() != null && parsed < parameter.minimum())
+                                    || (parameter.maximum() != null && parsed > parameter.maximum())) {
+                                issues.add(new SymbolDiagnostic("CANONICAL_PARAMETER_RANGE",
+                                        "Parameter is outside its allowed range: " + parameter.id(), glyph.instanceId()));
+                            }
+                        }
+                        case DECIMAL -> {
+                            double parsed = Double.parseDouble(value);
+                            if (!Double.isFinite(parsed)) throw new NumberFormatException();
+                        }
+                        case BOOLEAN -> {
+                            if (!value.equals("true") && !value.equals("false")) throw new IllegalArgumentException();
+                        }
+                        case IDENTIFIER -> requireIdentifier(value, "parameter value");
+                    }
+                } catch (RuntimeException ex) {
+                    issues.add(new SymbolDiagnostic("CANONICAL_PARAMETER_TYPE",
+                            "Parameter has an invalid value: " + parameter.id(), glyph.instanceId()));
+                }
+            }
+        }
+        Map<String, CanonicalGlyph> glyphsById = new LinkedHashMap<>();
+        for (CanonicalGlyph glyph : weave.glyphs()) glyphsById.putIfAbsent(glyph.instanceId(), glyph);
+        Set<String> boundInputs = new HashSet<>();
+        Set<String> seenConnections = new HashSet<>();
+        Map<String, List<String>> outgoing = new HashMap<>();
+        Map<String, Integer> indegree = new HashMap<>();
+        glyphsById.keySet().forEach(id -> indegree.put(id, 0));
+
+        for (CanonicalConnection connection : weave.connections()) {
+            CanonicalGlyph fromGlyph = glyphsById.get(connection.fromGlyph());
+            CanonicalGlyph toGlyph = glyphsById.get(connection.toGlyph());
+            if (fromGlyph == null || toGlyph == null) {
+                issues.add(new SymbolDiagnostic("CANONICAL_UNKNOWN_CONNECTION_GLYPH",
+                        "Connection references an unknown glyph instance.", fromGlyph == null
+                        ? connection.fromGlyph() : connection.toGlyph()));
+                continue;
+            }
+            String connectionKey = connection.fromGlyph() + ":" + connection.fromPort()
+                    + "->" + connection.toGlyph() + ":" + connection.toPort();
+            if (!seenConnections.add(connectionKey)) {
+                issues.add(new SymbolDiagnostic("CANONICAL_DUPLICATE_CONNECTION",
+                        "Duplicate canonical connection.", connection.toGlyph()));
+                continue;
+            }
+            StandardSymbolDefinition fromDefinition = registry.definition(fromGlyph.symbolId());
+            StandardSymbolDefinition toDefinition = registry.definition(toGlyph.symbolId());
+            if (fromDefinition == null || toDefinition == null
+                    || !fromDefinition.instantiable() || !toDefinition.instantiable()) continue;
+            PortDefinition output = fromDefinition.outputs().get(connection.fromPort());
+            PortDefinition input = toDefinition.inputs().get(connection.toPort());
+            if (output == null) {
+                issues.add(new SymbolDiagnostic("CANONICAL_UNKNOWN_OUTPUT_PORT",
+                        "Source port is not defined by the standard symbol.", fromGlyph.instanceId()));
+                continue;
+            }
+            if (input == null) {
+                issues.add(new SymbolDiagnostic("CANONICAL_UNKNOWN_INPUT_PORT",
+                        "Target port is not defined by the standard symbol.", toGlyph.instanceId()));
+                continue;
+            }
+            if (output.essence() != input.essence()) {
+                issues.add(new SymbolDiagnostic("CANONICAL_PORT_TYPE_MISMATCH",
+                        "Connected standard ports have incompatible types.", toGlyph.instanceId()));
+                continue;
+            }
+            String inputKey = toGlyph.instanceId() + ":" + input.id();
+            if (!boundInputs.add(inputKey)) {
+                issues.add(new SymbolDiagnostic("CANONICAL_INPUT_ALREADY_BOUND",
+                        "A required input port may only have one incoming connection.", toGlyph.instanceId()));
+                continue;
+            }
+            outgoing.computeIfAbsent(fromGlyph.instanceId(), ignored -> new ArrayList<>())
+                    .add(toGlyph.instanceId());
+            indegree.merge(toGlyph.instanceId(), 1, Integer::sum);
+        }
+
+        for (CanonicalGlyph glyph : glyphsById.values()) {
+            StandardSymbolDefinition definition = registry.definition(glyph.symbolId());
+            if (definition == null || !definition.instantiable()) continue;
+            for (PortDefinition input : definition.inputs().values()) {
+                if (input.required() && !boundInputs.contains(glyph.instanceId() + ":" + input.id())) {
+                    issues.add(new SymbolDiagnostic("CANONICAL_UNBOUND_REQUIRED_INPUT",
+                            "Required input port is not connected: " + input.id(), glyph.instanceId()));
+                }
+            }
+        }
+
+        List<String> queue = new ArrayList<>();
+        indegree.forEach((id, degree) -> { if (degree == 0) queue.add(id); });
+        int visited = 0;
+        for (int i = 0; i < queue.size(); i++) {
+            String id = queue.get(i);
+            visited++;
+            for (String target : outgoing.getOrDefault(id, List.of())) {
+                if (indegree.merge(target, -1, Integer::sum) == 0) queue.add(target);
+            }
+        }
+        if (visited != glyphsById.size()) {
+            issues.add(new SymbolDiagnostic("CANONICAL_UNBOUNDED_CYCLE",
+                    "Canonical connections must be acyclic; bounded repetition owns its internal loop.", null));
+        }
+        validateCanonicalRegions(weave, registry, glyphsById, issues);
+        return new SymbolValidation(issues);
+    }
+
+    private static void validateCanonicalRegions(CanonicalWeave weave, StandardSymbolRegistry registry,
+            Map<String, CanonicalGlyph> glyphsById, List<SymbolDiagnostic> issues) {
+        Map<String, CanonicalRegion> regionsById = new LinkedHashMap<>();
+        Map<String, Set<String>> portsByOwner = new HashMap<>();
+        Map<String, Set<String>> directMembersByRegion = new HashMap<>();
+
+        for (CanonicalRegion region : weave.regions()) {
+            if (regionsById.putIfAbsent(region.id(), region) != null) {
+                issues.add(new SymbolDiagnostic("CANONICAL_DUPLICATE_REGION",
+                        "Duplicate control-region id.", region.id()));
+                continue;
+            }
+            CanonicalGlyph owner = glyphsById.get(region.ownerGlyph());
+            if (owner == null) {
+                issues.add(new SymbolDiagnostic("CANONICAL_REGION_UNKNOWN_OWNER",
+                        "Control region references an unknown owner glyph.", region.ownerGlyph()));
+                continue;
+            }
+            StandardSymbolDefinition ownerDefinition = registry.definition(owner.symbolId());
+            if (ownerDefinition == null || !ownerDefinition.instantiable()) continue;
+            boolean validOwnerPort = ownerDefinition.outputs().containsKey(region.ownerPort());
+            boolean supportedOwner = switch (owner.symbolId()) {
+                case "arcana:control/branch" ->
+                        region.ownerPort().equals("whenTrue") || region.ownerPort().equals("whenFalse");
+                case "arcana:control/repeat" -> region.ownerPort().equals("body");
+                default -> false;
+            };
+            if (!validOwnerPort || !supportedOwner) {
+                issues.add(new SymbolDiagnostic("CANONICAL_REGION_INVALID_OWNER_PORT",
+                        "Only branch arms and bounded-repeat body ports may own control regions.", owner.instanceId()));
+            }
+            if (!portsByOwner.computeIfAbsent(owner.instanceId(), ignored -> new HashSet<>())
+                    .add(region.ownerPort())) {
+                issues.add(new SymbolDiagnostic("CANONICAL_REGION_DUPLICATE_OWNER_PORT",
+                        "A control output port may own only one region.", owner.instanceId()));
+            }
+
+            Set<String> members = new HashSet<>(region.memberGlyphs());
+            if (members.size() != region.memberGlyphs().size()) {
+                issues.add(new SymbolDiagnostic("CANONICAL_REGION_DUPLICATE_MEMBER",
+                        "A control region cannot list a glyph more than once.", region.id()));
+            }
+            if (!members.contains(region.entryGlyph()) || !members.contains(region.exitGlyph())) {
+                issues.add(new SymbolDiagnostic("CANONICAL_REGION_BOUNDARY_OUTSIDE",
+                        "Region entry and exit glyphs must belong to the region.", region.id()));
+            }
+            if (members.contains(region.ownerGlyph())) {
+                issues.add(new SymbolDiagnostic("CANONICAL_REGION_CONTAINS_OWNER",
+                        "A control region cannot contain its own controlling glyph.", region.id()));
+            }
+            for (String member : members) {
+                if (!glyphsById.containsKey(member)) {
+                    issues.add(new SymbolDiagnostic("CANONICAL_REGION_UNKNOWN_MEMBER",
+                            "Control region contains an unknown glyph instance.", member));
+                }
+            }
+            directMembersByRegion.put(region.id(), members);
+        }
+
+        for (CanonicalRegion region : regionsById.values()) {
+            if (region.parentRegionId() != null) {
+                CanonicalRegion parent = regionsById.get(region.parentRegionId());
+                if (parent == null) {
+                    issues.add(new SymbolDiagnostic("CANONICAL_REGION_UNKNOWN_PARENT",
+                            "Nested control region references an unknown parent.", region.id()));
+                    continue;
+                }
+                Set<String> parentMembers = directMembersByRegion.getOrDefault(parent.id(), Set.of());
+                if (!parentMembers.contains(region.ownerGlyph())) {
+                    issues.add(new SymbolDiagnostic("CANONICAL_REGION_OWNER_OUTSIDE_PARENT",
+                            "A nested region owner must be a member of its parent region.", region.id()));
+                }
+                if (!parentMembers.containsAll(directMembersByRegion.getOrDefault(region.id(), Set.of()))) {
+                    issues.add(new SymbolDiagnostic("CANONICAL_REGION_ESCAPES_PARENT",
+                            "A nested region cannot contain glyphs outside its parent region.", region.id()));
+                }
+                if (region.id().equals(parent.id())) {
+                    issues.add(new SymbolDiagnostic("CANONICAL_REGION_PARENT_CYCLE",
+                            "A control region cannot be its own parent.", region.id()));
+                }
+            }
+        }
+
+        Set<CanonicalConnection> connectionSet = new HashSet<>(weave.connections());
+        Map<String, String> branchJoinByOwner = new HashMap<>();
+        Map<String, Set<String>> branchJoinPorts = new HashMap<>();
+        for (CanonicalRegion region : regionsById.values()) {
+            CanonicalGlyph owner = glyphsById.get(region.ownerGlyph());
+            CanonicalGlyph entry = glyphsById.get(region.entryGlyph());
+            CanonicalGlyph exit = glyphsById.get(region.exitGlyph());
+            if (owner == null || entry == null || exit == null) continue;
+            StandardSymbolDefinition entryDefinition = registry.definition(entry.symbolId());
+            StandardSymbolDefinition exitDefinition = registry.definition(exit.symbolId());
+            if (!"arcana:control/entry".equals(entry.symbolId())
+                    || entryDefinition == null || !entryDefinition.inputs().containsKey("flow")) {
+                issues.add(new SymbolDiagnostic("CANONICAL_REGION_INVALID_ENTRY",
+                        "A control region must begin at a standard control/entry glyph.", region.id()));
+            }
+            CanonicalConnection entryConnection = new CanonicalConnection(
+                    region.ownerGlyph(), region.ownerPort(), region.entryGlyph(), "flow");
+            if (!connectionSet.contains(entryConnection)) {
+                issues.add(new SymbolDiagnostic("CANONICAL_REGION_ENTRY_NOT_CONNECTED",
+                        "The owner output must connect directly to the region entry flow input.", region.id()));
+            }
+            long ownerPortConnections = weave.connections().stream()
+                    .filter(connection -> connection.fromGlyph().equals(region.ownerGlyph())
+                            && connection.fromPort().equals(region.ownerPort())).count();
+            if (ownerPortConnections != 1) {
+                issues.add(new SymbolDiagnostic("CANONICAL_REGION_OWNER_PORT_FANOUT",
+                        "A control-region owner port must connect only to its declared entry.", region.id()));
+            }
+            PortDefinition exitPort = exitDefinition == null ? null : exitDefinition.outputs().get(region.exitPort());
+            if (exitPort == null || exitPort.essence() != Essence.SIGNAL) {
+                issues.add(new SymbolDiagnostic("CANONICAL_REGION_INVALID_EXIT",
+                        "A control region must exit through a registered SIGNAL output port.", region.id()));
+                continue;
+            }
+            List<CanonicalConnection> exitConnections = weave.connections().stream()
+                    .filter(connection -> connection.fromGlyph().equals(region.exitGlyph())
+                            && connection.fromPort().equals(region.exitPort()))
+                    .toList();
+            if (owner.symbolId().equals("arcana:control/repeat")) {
+                if (!exitConnections.isEmpty()) {
+                    issues.add(new SymbolDiagnostic("CANONICAL_REPEAT_BODY_ESCAPES",
+                            "A repeat body exit is captured by its bounded controller and cannot fan out.", region.id()));
+                }
+            } else if (owner.symbolId().equals("arcana:control/branch")) {
+                if (exitConnections.size() != 1) {
+                    issues.add(new SymbolDiagnostic("CANONICAL_BRANCH_ARM_EXIT",
+                            "Each branch arm must exit through exactly one connection to a join.", region.id()));
+                    continue;
+                }
+                CanonicalConnection exitConnection = exitConnections.getFirst();
+                if (directMembersByRegion.getOrDefault(region.id(), Set.of()).contains(exitConnection.toGlyph())) {
+                    issues.add(new SymbolDiagnostic("CANONICAL_BRANCH_ARM_EXIT_INTERNAL",
+                            "A branch arm exit must leave its region and enter a join.", region.id()));
+                    continue;
+                }
+                CanonicalGlyph target = glyphsById.get(exitConnection.toGlyph());
+                if (target == null || !target.symbolId().equals("arcana:control/join")
+                        || !(exitConnection.toPort().equals("left") || exitConnection.toPort().equals("right"))) {
+                    issues.add(new SymbolDiagnostic("CANONICAL_BRANCH_ARM_NOT_JOINED",
+                            "A branch arm must connect its exit to a standard join input.", region.id()));
+                    continue;
+                }
+                String priorJoin = branchJoinByOwner.putIfAbsent(owner.instanceId(), target.instanceId());
+                if (priorJoin != null && !priorJoin.equals(target.instanceId())) {
+                    issues.add(new SymbolDiagnostic("CANONICAL_BRANCH_JOIN_MISMATCH",
+                            "Both branch arms must converge on the same join glyph.", owner.instanceId()));
+                }
+                if (!branchJoinPorts.computeIfAbsent(owner.instanceId(), ignored -> new HashSet<>())
+                        .add(exitConnection.toPort())) {
+                    issues.add(new SymbolDiagnostic("CANONICAL_BRANCH_JOIN_INPUT_REUSED",
+                            "Branch arms must use distinct join inputs.", owner.instanceId()));
+                }
+            }
+        }
+
+        // Signal connections may cross a region boundary only at its declared entry or exit.
+        for (CanonicalRegion region : regionsById.values()) {
+            Set<String> members = directMembersByRegion.getOrDefault(region.id(), Set.of());
+            for (CanonicalConnection connection : weave.connections()) {
+                boolean fromInside = members.contains(connection.fromGlyph());
+                boolean toInside = members.contains(connection.toGlyph());
+                if (fromInside == toInside) continue;
+                boolean declaredEntry = !fromInside
+                        && connection.fromGlyph().equals(region.ownerGlyph())
+                        && connection.fromPort().equals(region.ownerPort())
+                        && connection.toGlyph().equals(region.entryGlyph())
+                        && connection.toPort().equals("flow");
+                boolean declaredExit = fromInside
+                        && connection.fromGlyph().equals(region.exitGlyph())
+                        && connection.fromPort().equals(region.exitPort())
+                        && connection.toGlyph().equals(branchJoinByOwner.get(region.ownerGlyph()));
+                if (declaredEntry || declaredExit) continue;
+                CanonicalGlyph from = glyphsById.get(connection.fromGlyph());
+                CanonicalGlyph to = glyphsById.get(connection.toGlyph());
+                StandardSymbolDefinition fromDef = from == null ? null : registry.definition(from.symbolId());
+                StandardSymbolDefinition toDef = to == null ? null : registry.definition(to.symbolId());
+                PortDefinition out = fromDef == null ? null : fromDef.outputs().get(connection.fromPort());
+                PortDefinition in = toDef == null ? null : toDef.inputs().get(connection.toPort());
+                if (out != null && in != null && out.essence() == Essence.SIGNAL && in.essence() == Essence.SIGNAL) {
+                    issues.add(new SymbolDiagnostic("CANONICAL_REGION_CONTROL_FLOW_ESCAPE",
+                            "Control-flow connections cannot enter or leave a region except through its declared boundaries.", region.id()));
+                }
+            }
+        }
+
+        // Sibling regions may not claim the same glyph. Nested regions are the only permitted overlap.
+        List<CanonicalRegion> all = new ArrayList<>(regionsById.values());
+        for (int i = 0; i < all.size(); i++) {
+            for (int j = i + 1; j < all.size(); j++) {
+                CanonicalRegion first = all.get(i), second = all.get(j);
+                boolean ancestorRelated = isRegionAncestor(first, second, regionsById)
+                        || isRegionAncestor(second, first, regionsById);
+                if (ancestorRelated) continue;
+                Set<String> overlap = new HashSet<>(directMembersByRegion.getOrDefault(first.id(), Set.of()));
+                overlap.retainAll(directMembersByRegion.getOrDefault(second.id(), Set.of()));
+                if (!overlap.isEmpty()) {
+                    issues.add(new SymbolDiagnostic("CANONICAL_REGION_OVERLAP",
+                            "Sibling or unrelated control regions cannot share glyph instances.", first.id()));
+                }
+            }
+        }
+
+        for (CanonicalGlyph glyph : glyphsById.values()) {
+            if (glyph.symbolId().equals("arcana:control/branch")) {
+                Set<String> ports = portsByOwner.getOrDefault(glyph.instanceId(), Set.of());
+                if (!ports.containsAll(Set.of("whenTrue", "whenFalse"))) {
+                    issues.add(new SymbolDiagnostic("CANONICAL_BRANCH_REGION_MISSING",
+                            "A branch must define both true and false regions.", glyph.instanceId()));
+                }
+            } else if (glyph.symbolId().equals("arcana:control/repeat")) {
+                if (!portsByOwner.getOrDefault(glyph.instanceId(), Set.of()).contains("body")) {
+                    issues.add(new SymbolDiagnostic("CANONICAL_REPEAT_BODY_MISSING",
+                            "A bounded repeat must define exactly one body region.", glyph.instanceId()));
+                }
+            }
+        }
+
+        // Parent references must form a forest, not a cyclic containment graph.
+        for (CanonicalRegion region : regionsById.values()) {
+            Set<String> visited = new HashSet<>();
+            CanonicalRegion cursor = region;
+            while (cursor != null && cursor.parentRegionId() != null) {
+                if (!visited.add(cursor.id())) {
+                    issues.add(new SymbolDiagnostic("CANONICAL_REGION_PARENT_CYCLE",
+                            "Control-region nesting contains a cycle.", region.id()));
+                    break;
+                }
+                cursor = regionsById.get(cursor.parentRegionId());
+            }
+        }
+    }
+
+    private static boolean isRegionAncestor(CanonicalRegion ancestor, CanonicalRegion child,
+            Map<String, CanonicalRegion> regionsById) {
+        Set<String> visited = new HashSet<>();
+        CanonicalRegion cursor = child;
+        while (cursor != null && cursor.parentRegionId() != null && visited.add(cursor.id())) {
+            if (cursor.parentRegionId().equals(ancestor.id())) return true;
+            cursor = regionsById.get(cursor.parentRegionId());
+        }
+        return false;
+    }
+
+    /** Sum of Arcana-owned structural weights, not source-language length or mana cost. */
+    public static int canonicalComplexity(CanonicalWeave weave, StandardSymbolRegistry registry) {
+        SymbolValidation validation = validateCanonical(weave, registry);
+        if (!validation.valid()) throw new IllegalArgumentException("Cannot measure an invalid canonical weave.");
+        long total = 0;
+        for (CanonicalGlyph glyph : weave.glyphs()) {
+            total += registry.definition(glyph.symbolId()).complexityWeight();
+            if (total > Integer.MAX_VALUE) throw new IllegalArgumentException("Canonical complexity overflow.");
+        }
+        return (int) total;
+    }
+
+    public enum GlyphKind { INVOCATION, TRANSFORM, BRANCH, NEXUS, REPETITION, WARD, SIGIL, CORE, MANIFESTATION }
+    public enum HostKind { PAGE, ITEM, BLOCK, STRUCTURE_PART }
+
+    public record Glyph(String id, GlyphKind kind, Map<String, Essence> offerings,
+                        Map<String, Essence> receptions, Map<String, String> inscriptions) {
+        public Glyph {
+            requireIdentifier(id, "glyph id");
+            Objects.requireNonNull(kind, "kind");
+            offerings = immutableEssences(offerings, "offerings");
+            receptions = immutableEssences(receptions, "receptions");
+            inscriptions = Map.copyOf(Objects.requireNonNull(inscriptions, "inscriptions"));
+            if (inscriptions.size() > 32) throw new IllegalArgumentException("Too many glyph inscriptions.");
+            if (kind == GlyphKind.INVOCATION && (!receptions.isEmpty() || offerings.isEmpty()))
+                throw new IllegalArgumentException("An INVOCATION offers essences and receives none.");
+            if (kind == GlyphKind.MANIFESTATION && (!offerings.isEmpty() || receptions.isEmpty()))
+                throw new IllegalArgumentException("A MANIFESTATION receives essences and offers none.");
+            if (kind == GlyphKind.REPETITION) {
+                int count;
+                try { count = Integer.parseInt(inscriptions.getOrDefault("maxIterations", "")); }
+                catch (NumberFormatException ex) { throw new IllegalArgumentException("REPETITION requires a bounded maxIterations."); }
+                if (count < 1 || count > MAX_REPETITIONS)
+                    throw new IllegalArgumentException("maxIterations is outside the supported bound.");
+            }
+        }
+    }
+
+    /** A mana vein connects one named offering to one compatible reception. */
+    public record ManaVein(String fromGlyph, String fromOffering, String toGlyph, String toReception) {
+        public ManaVein {
+            requireIdentifier(fromGlyph, "source glyph");
+            requireIdentifier(fromOffering, "source offering");
+            requireIdentifier(toGlyph, "target glyph");
+            requireIdentifier(toReception, "target reception");
+        }
+    }
+
+    public record Weave(String id, int version, List<Glyph> glyphs, List<ManaVein> veins,
+                        Set<String> invocations, Set<String> manifestations) {
+        public Weave {
+            requireNamespacedId(id, "weave id");
+            if (version < 1) throw new IllegalArgumentException("Weave version must be positive.");
+            glyphs = List.copyOf(Objects.requireNonNull(glyphs));
+            veins = List.copyOf(Objects.requireNonNull(veins));
+            invocations = Set.copyOf(Objects.requireNonNull(invocations));
+            manifestations = Set.copyOf(Objects.requireNonNull(manifestations));
+        }
+    }
+
+    /** A host exposes physical capacity and named attachment anchors. */
+    public record Host(String id, HostKind kind, int glyphCapacity, Set<String> anchors) {
+        public Host {
+            requireNamespacedId(id, "host id");
+            Objects.requireNonNull(kind, "kind");
+            if (glyphCapacity < 1 || glyphCapacity > MAX_GLYPHS)
+                throw new IllegalArgumentException("Host capacity must be between 1 and " + MAX_GLYPHS + ".");
+            anchors = Set.copyOf(Objects.requireNonNull(anchors));
+            if (anchors.isEmpty()) throw new IllegalArgumentException("A host must expose at least one anchor.");
+            anchors.forEach(anchor -> requireIdentifier(anchor, "host anchor"));
+        }
+    }
+
+    /** Binds a logical glyph to a physical host anchor. */
+    public record Placement(String glyphId, String hostId, String anchor) {
+        public Placement {
+            requireIdentifier(glyphId, "glyph id");
+            requireNamespacedId(hostId, "host id");
+            requireIdentifier(anchor, "host anchor");
+        }
+    }
+
+    /** Connections between different hosts must be explicitly installed. */
+    public record HostLink(String firstHostId, String secondHostId) {
+        public HostLink {
+            requireNamespacedId(firstHostId, "first host id");
+            requireNamespacedId(secondHostId, "second host id");
+            if (firstHostId.equals(secondHostId)) throw new IllegalArgumentException("A host link must join two distinct hosts.");
+        }
+        public boolean joins(String first, String second) {
+            return (firstHostId.equals(first) && secondHostId.equals(second))
+                    || (firstHostId.equals(second) && secondHostId.equals(first));
+        }
+    }
+
+    public record Installation(String id, String weaveId, List<Host> hosts,
+                               List<Placement> placements, Set<HostLink> links) {
+        public Installation {
+            requireNamespacedId(id, "installation id");
+            requireNamespacedId(weaveId, "weave id");
+            hosts = List.copyOf(Objects.requireNonNull(hosts));
+            placements = List.copyOf(Objects.requireNonNull(placements));
+            links = Set.copyOf(Objects.requireNonNull(links));
+        }
+    }
+
+    public record Diagnostic(String code, String message, String glyphId) {
+        public Diagnostic { Objects.requireNonNull(code); Objects.requireNonNull(message); }
+    }
+
+    public record Validation(List<Diagnostic> diagnostics) {
+        public Validation { diagnostics = List.copyOf(diagnostics); }
+        public boolean valid() { return diagnostics.isEmpty(); }
+    }
+
+    public static Validation validate(Weave weave) {
+        Objects.requireNonNull(weave, "weave");
+        List<Diagnostic> issues = new ArrayList<>();
+        if (weave.glyphs().isEmpty()) add(issues, "WEAVE_EMPTY", "A weave must contain at least one glyph.", null);
+        if (weave.glyphs().size() > MAX_GLYPHS) add(issues, "WEAVE_GLYPH_LIMIT", "Weave exceeds the glyph limit.", null);
+        if (weave.veins().size() > MAX_VEINS) add(issues, "WEAVE_VEIN_LIMIT", "Weave exceeds the mana-vein limit.", null);
+
+        Map<String, Glyph> glyphs = new LinkedHashMap<>();
+        for (Glyph glyph : weave.glyphs()) {
+            if (glyphs.putIfAbsent(glyph.id(), glyph) != null)
+                add(issues, "WEAVE_DUPLICATE_GLYPH", "Duplicate glyph id: " + glyph.id(), glyph.id());
+        }
+        if (weave.invocations().isEmpty()) add(issues, "WEAVE_NO_INVOCATION", "A weave needs an invocation glyph.", null);
+        if (weave.manifestations().isEmpty()) add(issues, "WEAVE_NO_MANIFESTATION", "A weave needs a manifestation glyph.", null);
+        for (String id : weave.invocations()) {
+            Glyph glyph = glyphs.get(id);
+            if (glyph == null) add(issues, "WEAVE_UNKNOWN_INVOCATION", "Unknown invocation glyph: " + id, id);
+            else if (glyph.kind() != GlyphKind.INVOCATION) add(issues, "WEAVE_INVALID_INVOCATION", "Invocation must reference an INVOCATION glyph.", id);
+        }
+        for (String id : weave.manifestations()) {
+            Glyph glyph = glyphs.get(id);
+            if (glyph == null) add(issues, "WEAVE_UNKNOWN_MANIFESTATION", "Unknown manifestation glyph: " + id, id);
+            else if (glyph.kind() != GlyphKind.MANIFESTATION) add(issues, "WEAVE_INVALID_MANIFESTATION", "Manifestation must reference a MANIFESTATION glyph.", id);
+        }
+
+        Map<String, Integer> incoming = new HashMap<>();
+        Map<String, List<String>> outgoing = new HashMap<>();
+        Set<String> seenVeins = new HashSet<>();
+        for (ManaVein vein : weave.veins()) {
+            Glyph from = glyphs.get(vein.fromGlyph()), to = glyphs.get(vein.toGlyph());
+            if (from == null || to == null) {
+                add(issues, "WEAVE_UNKNOWN_GLYPH", "A mana vein references an unknown glyph.", null);
+                continue;
+            }
+            String key = vein.fromGlyph() + ":" + vein.fromOffering() + "->" + vein.toGlyph() + ":" + vein.toReception();
+            if (!seenVeins.add(key)) { add(issues, "WEAVE_DUPLICATE_VEIN", "Duplicate mana vein.", to.id()); continue; }
+            Essence offered = from.offerings().get(vein.fromOffering());
+            Essence received = to.receptions().get(vein.toReception());
+            if (offered == null) { add(issues, "WEAVE_UNKNOWN_OFFERING", "Unknown offering: " + vein.fromOffering(), from.id()); continue; }
+            if (received == null) { add(issues, "WEAVE_UNKNOWN_RECEPTION", "Unknown reception: " + vein.toReception(), to.id()); continue; }
+            if (offered != received) { add(issues, "WEAVE_ESSENCE_MISMATCH", "Mana-vein endpoints must carry the same essence.", to.id()); continue; }
+            String receptionKey = to.id() + ":" + vein.toReception();
+            if (incoming.merge(receptionKey, 1, Integer::sum) > 1)
+                add(issues, "WEAVE_RECEPTION_ALREADY_BOUND", "A reception may have only one incoming vein.", to.id());
+            outgoing.computeIfAbsent(from.id(), ignored -> new ArrayList<>()).add(to.id());
+        }
+
+        for (Glyph glyph : glyphs.values()) {
+            for (String reception : glyph.receptions().keySet()) {
+                if (glyph.kind() != GlyphKind.INVOCATION && !incoming.containsKey(glyph.id() + ":" + reception))
+                    add(issues, "WEAVE_UNBOUND_RECEPTION", "Unbound reception: " + reception, glyph.id());
+            }
+        }
+        validateAcyclic(glyphs, outgoing, issues);
+        validateReachability(glyphs, outgoing, weave.invocations(), issues);
+        return new Validation(issues);
+    }
+
+    public static Validation validateInstallation(Weave weave, Installation installation) {
+        Objects.requireNonNull(weave, "weave");
+        Objects.requireNonNull(installation, "installation");
+        List<Diagnostic> issues = new ArrayList<>(validate(weave).diagnostics());
+        if (!installation.weaveId().equals(weave.id()))
+            add(issues, "INSTALLATION_WEAVE_MISMATCH", "Installation references a different weave.", null);
+        Map<String, Host> hosts = new HashMap<>();
+        for (Host host : installation.hosts()) {
+            if (hosts.putIfAbsent(host.id(), host) != null)
+                add(issues, "INSTALLATION_DUPLICATE_HOST", "Duplicate host id: " + host.id(), null);
+        }
+        Map<String, Glyph> glyphs = new HashMap<>();
+        weave.glyphs().forEach(glyph -> glyphs.putIfAbsent(glyph.id(), glyph));
+        Map<String, String> placementByGlyph = new HashMap<>();
+        Map<String, Integer> loadByHost = new HashMap<>();
+        for (Placement placement : installation.placements()) {
+            if (!glyphs.containsKey(placement.glyphId())) {
+                add(issues, "INSTALLATION_UNKNOWN_GLYPH", "Placement references an unknown glyph.", placement.glyphId());
+                continue;
+            }
+            if (placementByGlyph.putIfAbsent(placement.glyphId(), placement.hostId()) != null)
+                add(issues, "INSTALLATION_DUPLICATE_PLACEMENT", "Glyph is placed more than once.", placement.glyphId());
+            Host host = hosts.get(placement.hostId());
+            if (host == null) { add(issues, "INSTALLATION_UNKNOWN_HOST", "Placement references an unknown host.", placement.glyphId()); continue; }
+            if (!host.anchors().contains(placement.anchor()))
+                add(issues, "INSTALLATION_UNKNOWN_ANCHOR", "Host does not expose anchor: " + placement.anchor(), placement.glyphId());
+            loadByHost.merge(host.id(), 1, Integer::sum);
+        }
+        for (String glyphId : glyphs.keySet()) {
+            if (!placementByGlyph.containsKey(glyphId))
+                add(issues, "INSTALLATION_UNPLACED_GLYPH", "Glyph has no physical host placement.", glyphId);
+        }
+        for (Map.Entry<String, Integer> load : loadByHost.entrySet()) {
+            Host host = hosts.get(load.getKey());
+            if (host != null && load.getValue() > host.glyphCapacity())
+                add(issues, "INSTALLATION_HOST_CAPACITY", "Host capacity is exceeded.", null);
+        }
+        for (ManaVein vein : weave.veins()) {
+            String fromHost = placementByGlyph.get(vein.fromGlyph());
+            String toHost = placementByGlyph.get(vein.toGlyph());
+            if (fromHost != null && toHost != null && !fromHost.equals(toHost)) {
+                boolean linked = installation.links().stream().anyMatch(link -> link.joins(fromHost, toHost));
+                if (!linked) add(issues, "INSTALLATION_HOSTS_NOT_LINKED",
+                        "A mana vein crossing hosts requires an explicit host link.", vein.toGlyph());
+            }
+        }
+        for (HostLink link : installation.links()) {
+            if (!hosts.containsKey(link.firstHostId()) || !hosts.containsKey(link.secondHostId()))
+                add(issues, "INSTALLATION_LINK_UNKNOWN_HOST", "Host link references an uninstalled host.", null);
+        }
+        return new Validation(issues);
+    }
+
+    private static void validateAcyclic(Map<String, Glyph> glyphs, Map<String, List<String>> outgoing, List<Diagnostic> issues) {
+        Map<String, Integer> indegree = new HashMap<>();
+        glyphs.keySet().forEach(id -> indegree.put(id, 0));
+        outgoing.values().forEach(targets -> targets.forEach(target -> indegree.merge(target, 1, Integer::sum)));
+        List<String> queue = new ArrayList<>();
+        indegree.forEach((id, degree) -> { if (degree == 0) queue.add(id); });
+        int visited = 0;
+        for (int i = 0; i < queue.size(); i++) {
+            String id = queue.get(i); visited++;
+            for (String target : outgoing.getOrDefault(id, List.of()))
+                if (indegree.merge(target, -1, Integer::sum) == 0) queue.add(target);
+        }
+        if (visited != glyphs.size()) add(issues, "WEAVE_UNBOUNDED_CYCLE",
+                "Weave paths must be acyclic; bounded repetition is represented by a REPETITION glyph, not a raw graph cycle.", null);
+    }
+
+    private static void validateReachability(Map<String, Glyph> glyphs, Map<String, List<String>> outgoing,
+                                             Set<String> invocations, List<Diagnostic> issues) {
+        Set<String> reached = new HashSet<>();
+        List<String> queue = new ArrayList<>(invocations);
+        for (int i = 0; i < queue.size(); i++) {
+            String id = queue.get(i);
+            if (!reached.add(id) || !glyphs.containsKey(id)) continue;
+            queue.addAll(outgoing.getOrDefault(id, List.of()));
+        }
+        for (String id : glyphs.keySet())
+            if (!reached.contains(id)) add(issues, "WEAVE_UNREACHABLE_GLYPH", "Glyph is unreachable from every invocation.", id);
+    }
+
+    private static Map<String, Essence> immutableEssences(Map<String, Essence> values, String label) {
+        Objects.requireNonNull(values, label);
+        if (values.size() > 32) throw new IllegalArgumentException("Too many " + label + ".");
+        Map<String, Essence> copy = new LinkedHashMap<>();
+        values.forEach((name, essence) -> {
+            requireIdentifier(name, label + " name");
+            copy.put(name, Objects.requireNonNull(essence, "essence"));
+        });
+        return Map.copyOf(copy);
+    }
+
+    private static void requireIdentifier(String value, String label) {
+        Objects.requireNonNull(value, label);
+        if (!value.matches("[A-Za-z0-9_.-]{1,64}")) throw new IllegalArgumentException("Invalid " + label + ".");
+    }
+    private static void requireNamespacedId(String value, String label) {
+        Objects.requireNonNull(value, label);
+        if (!value.matches("[a-z0-9_.-]+:[a-z0-9_./-]+")) throw new IllegalArgumentException(label + " must use namespace:path format.");
+    }
+    private static void add(List<Diagnostic> issues, String code, String message, String glyphId) {
+        issues.add(new Diagnostic(code, message, glyphId));
+    }
+}
