@@ -34,10 +34,13 @@ public final class CanonicalControlFlowPlan {
 
         List<String> nestedEntries = regions.stream()
                 .map(ArcaneWeave.CanonicalRegion::entryGlyph).toList();
+        List<String> controlFlowTargets = connections.stream()
+                .filter(edge -> edge.toPort().equals("flow"))
+                .map(ArcaneWeave.CanonicalConnection::toGlyph).toList();
         List<String> rootEntries = glyphs.stream()
                 .filter(glyph -> glyph.symbolId().equals("arcana:control/entry"))
                 .map(ArcaneWeave.CanonicalGlyph::instanceId)
-                .filter(id -> !nestedEntries.contains(id))
+                .filter(id -> !nestedEntries.contains(id) && !controlFlowTargets.contains(id))
                 .toList();
 
         List<RegionPlan> regionPlans = regions.stream().map(region -> new RegionPlan(
