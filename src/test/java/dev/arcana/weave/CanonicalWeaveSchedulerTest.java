@@ -110,6 +110,7 @@ class CanonicalWeaveSchedulerTest {
         assertTrue(result.evaluationOrder().contains("yes"));
         assertFalse(result.evaluationOrder().contains("no"));
         assertEquals(1, result.evaluationOrder().stream().filter("join"::equals).count());
+        assertFalse(result.values().containsKey(new CanonicalValueStore.PortAddress("unused", "number")));
     }
 
     @Test
@@ -170,6 +171,7 @@ class CanonicalWeaveSchedulerTest {
                 glyph("root", "arcana:control/entry", Map.of()),
                 glyph("one", "arcana:reference/number", Map.of("value", left)),
                 glyph("two", "arcana:reference/number", Map.of("value", right)),
+                glyph("unused", "arcana:reference/number", Map.of("value", "999")),
                 glyph("condition", "arcana:data/equal", Map.of()),
                 glyph("branch", "arcana:control/branch", Map.of()),
                 glyph("yes", "arcana:control/entry", Map.of()),
