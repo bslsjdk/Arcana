@@ -119,6 +119,18 @@ class CastingTriggerRecognizerTest {
     }
 
     @Test
+    void detectsCrossKindOverlapEvenWhenSameKindMatchIsNestedBetweenThem() {
+        var overlapping = new CastingTriggerRecognizer.TriggerProfile(
+                List.of("red blue green yellow", "blue"),
+                List.of("green yellow"));
+        var result = CastingTriggerRecognizer.recognize(
+                "begin red blue green yellow end", overlapping);
+
+        assertEquals(CastingTriggerRecognizer.Status.AMBIGUOUS, result.status());
+        assertFalse(result.mayStartCasting());
+    }
+
+    @Test
     void profileRejectsIdenticalActivationAndCancellationPhrases() {
         assertThrows(IllegalArgumentException.class, () ->
                 new CastingTriggerRecognizer.TriggerProfile(
