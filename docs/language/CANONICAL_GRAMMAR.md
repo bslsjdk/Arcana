@@ -44,7 +44,7 @@ A player language provides:
 - longest-match selection when phrase patterns overlap by prefix;
 - rejection of duplicate phrase patterns and collisions between single-token phrase rules and keyword aliases.
 
-Phrase rules support many source tokens mapping to one canonical token, and one short source token expanding into a larger canonical program. Replacement output is bounded to 65536 characters. Phrase matching operates on the current canonical lexer token model, preserves untouched source text, and does not rewrite text inside unmatched string literals.
+Phrase rules support many source tokens mapping to one canonical token, and one short source token expanding into a larger canonical program. Phrase patterns contain 1–64 word tokens, each language is limited to 256 phrase rules, and translated output is bounded to 65536 characters. Phrase matching operates on the current canonical lexer token model, preserves untouched source text and string literals, and uses deterministic longest-match selection.
 
 This is an incremental phrase-expansion layer, not a complete natural-language grammar engine. Arbitrary grammar productions, word-order transformations, inflection/morphology, syntax trees as rule patterns, and context-sensitive disambiguation remain future work. Translation output must still be parsed and semantically validated by the canonical pipeline; unsupported or ambiguous meaning must never be guessed.
 
