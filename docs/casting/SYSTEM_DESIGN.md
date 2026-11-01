@@ -205,3 +205,16 @@ A validated canonical weave can now be compiled into an immutable `CanonicalCont
 Loop iteration counters are keyed by both the canonical loop instance and a runtime activation ID. This matters when a loop is entered again from an outer loop: a completed activation can be explicitly released without confusing it with the next activation. Runtime value reservations can likewise be released, and rejected reservations do not partially mutate state.
 
 Each cast must own its own budget session. Sessions must never be stored on the immutable weave, compiled plan, player-independent symbol registry, or shared host definition. The budget class is accounting only; the interpreter must consume it before scheduling work or allocating runtime values. Capability authorization, mana accounting, and world mutation remain separate server-authoritative checks.
+
+
+## 13. Typed runtime value storage (first runtime data milestone)
+
+`CanonicalValueStore` is created for one already-validated `CanonicalWeave`, one Arcana-owned registry, and one per-cast execution-budget session. It indexes the actual canonical glyph instances before accepting writes. Callers identify an output by glyph instance ID; they cannot submit a fabricated glyph definition to impersonate a source node.
+
+The initial runtime value algebra supports bounded decimal numbers, booleans, bounded text, and finite 3D vectors. Entity and block references, mana values, and world-backed values are intentionally not constructible in this first pure-data layer.
+
+A value can be written only to an output port declared by the glyph's registered standard symbol, and its runtime essence must exactly match that port. Input reads follow the weave's explicit incoming connection and check both endpoint declarations and the stored value type. No implicit conversions, name-based fallback, or invented values are allowed. Missing output values remain a distinct runtime condition from an unbound or invalid input.
+
+Each newly stored output reserves one live runtime-value slot; replacing an existing output does not consume another slot. Clearing a glyph's outputs releases those slots. Store construction rejects invalid canonical weaves, and each store is tied to its own weave and budget session.
+
+This milestone is a typed value store, not yet a node scheduler or evaluator. It does not execute arithmetic symbols, evaluate branch conditions, access Minecraft state, resolve entity/block references, spend mana, or authorize capabilities. Those responsibilities must be added explicitly in later runtime layers.
