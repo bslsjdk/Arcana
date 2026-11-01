@@ -29,7 +29,7 @@ class CastingTriggerRecognizerTest {
                 "shape the light Astra bind it to the crystal", profile());
 
         assertEquals(CastingTriggerRecognizer.Status.ACTIVATED, result.status());
-        assertEquals("shape the light  bind it to the crystal", result.payload());
+        assertEquals("shape the light bind it to the crystal", result.payload());
         assertTrue(result.activationDetected());
     }
 
@@ -49,7 +49,7 @@ class CastingTriggerRecognizerTest {
 
         assertEquals(CastingTriggerRecognizer.Status.CANCELLED, result.status());
         assertTrue(result.cancelledAnActivatedCast());
-        assertEquals("shape  bind", result.payload());
+        assertEquals("shape bind", result.payload());
         assertFalse(result.mayStartCasting());
     }
 
@@ -92,7 +92,7 @@ class CastingTriggerRecognizerTest {
                 "shape Astra bind THE RITE IS ENDED trailing", profile());
 
         assertEquals(CastingTriggerRecognizer.Status.ACTIVATED, activated.status());
-        assertEquals("shape  bind", activated.payload());
+        assertEquals("shape bind", activated.payload());
         assertEquals(CastingTriggerRecognizer.Status.CANCELLED, cancelled.status());
         assertTrue(cancelled.cancelledAnActivatedCast());
     }
