@@ -6,6 +6,10 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.saveddata.SavedData;
 
+import java.nio.ByteBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.CodingErrorAction;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -20,7 +24,7 @@ import java.util.UUID;
  */
 public final class PlayerArcanaProfilesSavedData extends SavedData {
     private static final String DATA_NAME = "arcana_player_profiles";
-    private static final String PROFILES_KEY = "profiles_json";
+    private static final String PROFILES_KEY = "profiles_json_utf8";
 
     public static final Factory<PlayerArcanaProfilesSavedData> FACTORY =
             new Factory<>(PlayerArcanaProfilesSavedData::new,
@@ -69,16 +73,33 @@ public final class PlayerArcanaProfilesSavedData extends SavedData {
 
     private static PlayerArcanaProfilesSavedData load(
             CompoundTag tag, HolderLookup.Provider registries) {
-        if (!tag.contains(PROFILES_KEY, Tag.TAG_STRING)) {
-            throw new IllegalArgumentException("Saved Arcana player profile data is missing its JSON payload.");
+        if (!tag.contains(PROFILES_KEY, Tag.TAG_BYTE_ARRAY)) {
+            throw new IllegalArgumentException("Saved Arcana player profile data is missing its UTF-8 payload.");
         }
-        PlayerArcanaProfileStore loaded = PlayerArcanaProfileStore.decode(tag.getString(PROFILES_KEY));
+        byte[] bytes = tag.getByteArray(PROFILES_KEY);
+        if (bytes.length > PlayerArcanaProfileStore.MAX_STORE_JSON_BYTES) {
+            throw new IllegalArgumentException("Saved Arcana player profile data exceeds the byte limit.");
+        }
+        String json;
+        try {
+            json = StandardCharsets.UTF_8.newDecoder()
+                    .onMalformedInput(CodingErrorAction.REPORT)
+                    .onUnmappableCharacter(CodingErrorAction.REPORT)
+                    .decode(ByteBuffer.wrap(bytes)).toString();
+        } catch (CharacterCodingException exception) {
+            throw new IllegalArgumentException("Saved Arcana player profile data is not valid UTF-8.", exception);
+        }
+        PlayerArcanaProfileStore loaded = PlayerArcanaProfileStore.decode(json);
         return new PlayerArcanaProfilesSavedData(loaded);
     }
 
     @Override
     public CompoundTag save(CompoundTag tag, HolderLookup.Provider registries) {
-        tag.putString(PROFILES_KEY, store.encode());
+        byte[] bytes = store.encode().getBytes(StandardCharsets.UTF_8);
+        if (bytes.length > PlayerArcanaProfileStore.MAX_STORE_JSON_BYTES) {
+            throw new IllegalStateException("Saved Arcana player profile data exceeds the byte limit.");
+        }
+        tag.putByteArray(PROFILES_KEY, bytes);
         return tag;
     }
 }
