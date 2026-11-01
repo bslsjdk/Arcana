@@ -18,6 +18,8 @@ The long-term goal is a programmable magic framework for workings, rituals, alch
 
 ## Language and canonical symbols
 
+**Direct standard-script authoring is also a first-class route.** Players may write Arcana's own canonical magical characters directly, without defining a personal language. A personal language is an optional front end; both routes must converge on the same canonical parser and validators. The current nine registry IDs are provisional semantic building blocks, not the finished alphabet, and their English labels are not the visible glyphs. See [Canonical Glyph Script](docs/language/CANONICAL_GLYPH_SCRIPT.md) for the design boundary and implementation sequence.
+
 A player's language is an input layer, not a second magic system. It may use arbitrary vocabulary and, as the language engine grows, arbitrary grammar and phrase structures. A long sentence may translate to one standard symbol; a short word may translate to a large sequence of standard symbols. Multiple words may combine into one symbol, and one phrase may expand into a complete canonical structure.
 
 The translation output is restricted to symbols and operations registered by Arcana. A language definition may choose how its own expressions map to those existing meanings, but cannot declare a new symbol ID, invent a new operation, or change the meaning of an existing symbol. Unknown targets, conflicting rules, and ambiguous translations must fail closed.
