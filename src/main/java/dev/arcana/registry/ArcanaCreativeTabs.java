@@ -6,6 +6,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.registries.DeferredRegister;
+
 import java.util.function.Supplier;
 
 public final class ArcanaCreativeTabs {
@@ -18,8 +19,7 @@ public final class ArcanaCreativeTabs {
                     .icon(() -> new ItemStack(ArcanaItems.GRIMOIRE.get()))
                     .displayItems((parameters, output) -> {
                         output.accept(ArcanaItems.GRIMOIRE.get());
-                        output.accept(ArcanaItems.WAND.get());
-                        output.accept(ArcanaItems.STAFF.get());
+                        output.accept(ArcanaItems.FOCUS_CRYSTAL.get());
                         output.accept(ArcanaItems.SCROLL.get());
                     })
                     .build());
