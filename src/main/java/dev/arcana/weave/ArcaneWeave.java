@@ -102,18 +102,41 @@ public final class ArcaneWeave {
         }
     }
 
+    public record CanonicalRegion(String id, String ownerGlyph, String ownerPort,
+                                  String entryGlyph, String exitGlyph,
+                                  List<String> memberGlyphs, String parentRegionId) {
+        public CanonicalRegion {
+            requireIdentifier(id, "region id");
+            requireIdentifier(ownerGlyph, "region owner glyph");
+            requireIdentifier(ownerPort, "region owner port");
+            requireIdentifier(entryGlyph, "region entry glyph");
+            requireIdentifier(exitGlyph, "region exit glyph");
+            memberGlyphs = List.copyOf(Objects.requireNonNull(memberGlyphs, "member glyphs"));
+            if (memberGlyphs.isEmpty() || memberGlyphs.size() > MAX_GLYPHS)
+                throw new IllegalArgumentException("A control region must contain 1.." + MAX_GLYPHS + " glyphs.");
+            memberGlyphs.forEach(member -> requireIdentifier(member, "region member glyph"));
+            if (parentRegionId != null) requireIdentifier(parentRegionId, "parent region id");
+        }
+    }
+
     public record CanonicalWeave(String id, int version, List<CanonicalGlyph> glyphs,
-                                 List<CanonicalConnection> connections) {
+                                 List<CanonicalConnection> connections, List<CanonicalRegion> regions) {
         public CanonicalWeave(String id, int version, List<CanonicalGlyph> glyphs) {
-            this(id, version, glyphs, List.of());
+            this(id, version, glyphs, List.of(), List.of());
+        }
+        public CanonicalWeave(String id, int version, List<CanonicalGlyph> glyphs,
+                              List<CanonicalConnection> connections) {
+            this(id, version, glyphs, connections, List.of());
         }
         public CanonicalWeave {
             requireNamespacedId(id, "weave id");
             if (version < 1) throw new IllegalArgumentException("Weave version must be positive.");
             glyphs = List.copyOf(Objects.requireNonNull(glyphs, "glyphs"));
             connections = List.copyOf(Objects.requireNonNull(connections, "connections"));
+            regions = List.copyOf(Objects.requireNonNull(regions, "regions"));
             if (glyphs.size() > MAX_GLYPHS) throw new IllegalArgumentException("Weave exceeds the glyph limit.");
             if (connections.size() > MAX_VEINS) throw new IllegalArgumentException("Weave exceeds the connection limit.");
+            if (regions.size() > 256) throw new IllegalArgumentException("Weave exceeds the control-region limit.");
         }
     }
 
@@ -417,7 +440,150 @@ public final class ArcaneWeave {
             issues.add(new SymbolDiagnostic("CANONICAL_UNBOUNDED_CYCLE",
                     "Canonical connections must be acyclic; bounded repetition owns its internal loop.", null));
         }
+        validateCanonicalRegions(weave, registry, glyphsById, issues);
         return new SymbolValidation(issues);
+    }
+
+    private static void validateCanonicalRegions(CanonicalWeave weave, StandardSymbolRegistry registry,
+            Map<String, CanonicalGlyph> glyphsById, List<SymbolDiagnostic> issues) {
+        Map<String, CanonicalRegion> regionsById = new LinkedHashMap<>();
+        Map<String, Set<String>> portsByOwner = new HashMap<>();
+        Map<String, Set<String>> directMembersByRegion = new HashMap<>();
+
+        for (CanonicalRegion region : weave.regions()) {
+            if (regionsById.putIfAbsent(region.id(), region) != null) {
+                issues.add(new SymbolDiagnostic("CANONICAL_DUPLICATE_REGION",
+                        "Duplicate control-region id.", region.id()));
+                continue;
+            }
+            CanonicalGlyph owner = glyphsById.get(region.ownerGlyph());
+            if (owner == null) {
+                issues.add(new SymbolDiagnostic("CANONICAL_REGION_UNKNOWN_OWNER",
+                        "Control region references an unknown owner glyph.", region.ownerGlyph()));
+                continue;
+            }
+            StandardSymbolDefinition ownerDefinition = registry.definition(owner.symbolId());
+            if (ownerDefinition == null || !ownerDefinition.instantiable()) continue;
+            boolean validOwnerPort = ownerDefinition.outputs().containsKey(region.ownerPort());
+            boolean supportedOwner = switch (owner.symbolId()) {
+                case "arcana:control/branch" ->
+                        region.ownerPort().equals("whenTrue") || region.ownerPort().equals("whenFalse");
+                case "arcana:control/repeat" -> region.ownerPort().equals("body");
+                default -> false;
+            };
+            if (!validOwnerPort || !supportedOwner) {
+                issues.add(new SymbolDiagnostic("CANONICAL_REGION_INVALID_OWNER_PORT",
+                        "Only branch arms and bounded-repeat body ports may own control regions.", owner.instanceId()));
+            }
+            if (!portsByOwner.computeIfAbsent(owner.instanceId(), ignored -> new HashSet<>())
+                    .add(region.ownerPort())) {
+                issues.add(new SymbolDiagnostic("CANONICAL_REGION_DUPLICATE_OWNER_PORT",
+                        "A control output port may own only one region.", owner.instanceId()));
+            }
+
+            Set<String> members = new HashSet<>(region.memberGlyphs());
+            if (members.size() != region.memberGlyphs().size()) {
+                issues.add(new SymbolDiagnostic("CANONICAL_REGION_DUPLICATE_MEMBER",
+                        "A control region cannot list a glyph more than once.", region.id()));
+            }
+            if (!members.contains(region.entryGlyph()) || !members.contains(region.exitGlyph())) {
+                issues.add(new SymbolDiagnostic("CANONICAL_REGION_BOUNDARY_OUTSIDE",
+                        "Region entry and exit glyphs must belong to the region.", region.id()));
+            }
+            if (members.contains(region.ownerGlyph())) {
+                issues.add(new SymbolDiagnostic("CANONICAL_REGION_CONTAINS_OWNER",
+                        "A control region cannot contain its own controlling glyph.", region.id()));
+            }
+            for (String member : members) {
+                if (!glyphsById.containsKey(member)) {
+                    issues.add(new SymbolDiagnostic("CANONICAL_REGION_UNKNOWN_MEMBER",
+                            "Control region contains an unknown glyph instance.", member));
+                }
+            }
+            directMembersByRegion.put(region.id(), members);
+        }
+
+        for (CanonicalRegion region : regionsById.values()) {
+            if (region.parentRegionId() != null) {
+                CanonicalRegion parent = regionsById.get(region.parentRegionId());
+                if (parent == null) {
+                    issues.add(new SymbolDiagnostic("CANONICAL_REGION_UNKNOWN_PARENT",
+                            "Nested control region references an unknown parent.", region.id()));
+                    continue;
+                }
+                Set<String> parentMembers = directMembersByRegion.getOrDefault(parent.id(), Set.of());
+                if (!parentMembers.contains(region.ownerGlyph())) {
+                    issues.add(new SymbolDiagnostic("CANONICAL_REGION_OWNER_OUTSIDE_PARENT",
+                            "A nested region owner must be a member of its parent region.", region.id()));
+                }
+                if (!parentMembers.containsAll(directMembersByRegion.getOrDefault(region.id(), Set.of()))) {
+                    issues.add(new SymbolDiagnostic("CANONICAL_REGION_ESCAPES_PARENT",
+                            "A nested region cannot contain glyphs outside its parent region.", region.id()));
+                }
+                if (region.id().equals(parent.id())) {
+                    issues.add(new SymbolDiagnostic("CANONICAL_REGION_PARENT_CYCLE",
+                            "A control region cannot be its own parent.", region.id()));
+                }
+            }
+        }
+
+        // Sibling regions may not claim the same glyph. Nested regions are the only permitted overlap.
+        List<CanonicalRegion> all = new ArrayList<>(regionsById.values());
+        for (int i = 0; i < all.size(); i++) {
+            for (int j = i + 1; j < all.size(); j++) {
+                CanonicalRegion first = all.get(i), second = all.get(j);
+                boolean ancestorRelated = isRegionAncestor(first, second, regionsById)
+                        || isRegionAncestor(second, first, regionsById);
+                if (ancestorRelated) continue;
+                Set<String> overlap = new HashSet<>(directMembersByRegion.getOrDefault(first.id(), Set.of()));
+                overlap.retainAll(directMembersByRegion.getOrDefault(second.id(), Set.of()));
+                if (!overlap.isEmpty()) {
+                    issues.add(new SymbolDiagnostic("CANONICAL_REGION_OVERLAP",
+                            "Sibling or unrelated control regions cannot share glyph instances.", first.id()));
+                }
+            }
+        }
+
+        for (CanonicalGlyph glyph : glyphsById.values()) {
+            if (glyph.symbolId().equals("arcana:control:unused")) continue;
+            if (glyph.symbolId().equals("arcana:control/branch")) {
+                Set<String> ports = portsByOwner.getOrDefault(glyph.instanceId(), Set.of());
+                if (!ports.containsAll(Set.of("whenTrue", "whenFalse"))) {
+                    issues.add(new SymbolDiagnostic("CANONICAL_BRANCH_REGION_MISSING",
+                            "A branch must define both true and false regions.", glyph.instanceId()));
+                }
+            } else if (glyph.symbolId().equals("arcana:control/repeat")) {
+                if (!portsByOwner.getOrDefault(glyph.instanceId(), Set.of()).contains("body")) {
+                    issues.add(new SymbolDiagnostic("CANONICAL_REPEAT_BODY_MISSING",
+                            "A bounded repeat must define exactly one body region.", glyph.instanceId()));
+                }
+            }
+        }
+
+        // Parent references must form a forest, not a cyclic containment graph.
+        for (CanonicalRegion region : regionsById.values()) {
+            Set<String> visited = new HashSet<>();
+            CanonicalRegion cursor = region;
+            while (cursor != null && cursor.parentRegionId() != null) {
+                if (!visited.add(cursor.id())) {
+                    issues.add(new SymbolDiagnostic("CANONICAL_REGION_PARENT_CYCLE",
+                            "Control-region nesting contains a cycle.", region.id()));
+                    break;
+                }
+                cursor = regionsById.get(cursor.parentRegionId());
+            }
+        }
+    }
+
+    private static boolean isRegionAncestor(CanonicalRegion ancestor, CanonicalRegion child,
+            Map<String, CanonicalRegion> regionsById) {
+        Set<String> visited = new HashSet<>();
+        CanonicalRegion cursor = child;
+        while (cursor != null && cursor.parentRegionId() != null && visited.add(cursor.id())) {
+            if (cursor.parentRegionId().equals(ancestor.id())) return true;
+            cursor = regionsById.get(cursor.parentRegionId());
+        }
+        return false;
     }
 
     /** Sum of Arcana-owned structural weights, not source-language length or mana cost. */
