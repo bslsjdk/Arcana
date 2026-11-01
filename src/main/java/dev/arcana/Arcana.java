@@ -1,5 +1,7 @@
 package dev.arcana;
 
+import dev.arcana.registry.ArcanaItems;
+import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
 
 /** NeoForge entry point. The language core is independent from Minecraft APIs. */
@@ -7,7 +9,7 @@ import net.neoforged.fml.common.Mod;
 public final class Arcana {
     public static final String MOD_ID = "arcana";
 
-    public Arcana() {
-        // Gameplay registration follows after the language API stabilizes.
+    public Arcana(IEventBus modBus) {
+        ArcanaItems.ITEMS.register(modBus);
     }
 }
