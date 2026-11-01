@@ -1,130 +1,153 @@
-# Casting System Design
+# Arcana Casting and Weave Design
 
-Status: **rank rules and basic casting-media item registration implemented; spellbook UI and functional casting are not implemented yet**
+Status: **design baseline; the current rank rules and registered media are prototypes, not a playable casting system**
 
-This document defines the player-facing casting layer. The language engine describes a spell, but a player needs a learned spell and a suitable medium to invoke it in the world.
+Arcana is a system for creating magic, not selecting spells from a fixed catalogue. Players learn magical principles and construct their own workings from runes, glyphs, invocations, patterns, and mana pathways. The same construction can serve combat, tools, equipment, rituals, machines, buildings, and environmental interactions.
 
-## 1. Three separate concepts
+## 1. Core concepts
 
-Arcana must not collapse these into one level:
-- **Caster rank:** the player's current magical capability and control.
-- **Spell rank:** the complexity and power of the spell itself.
-- **Medium capacity:** the maximum spell rank a particular tool can safely channel or anchor.
+Keep these concepts separate:
 
-A high-rank caster may cast lower-rank spells. A low-rank caster cannot bypass their own rank limit by holding a powerful focus crystal. A high-rank caster also cannot force a weak focus crystal to channel a spell beyond that focus crystal's capacity.
+- **Player knowledge:** what the player understands and can recreate. Knowledge belongs to the player, not to a world-side spell unlock database.
+- **Language definition:** the player's custom vocabulary, symbols, grammar, word order, and inflection rules. It is data stored in a carrier such as a grimoire; it is not the player's knowledge itself.
+- **Arcana canonical language:** the one standard representation understood by the server.
+- **Magical working:** the actual program or structure authored by the player.
+- **Arcane weave:** the structured magical arrangement that describes relationships, flow, conditions, branches, repetition, and composition.
+- **Host / carrier:** the item, block, page, or structure that physically bears some or all of a weave.
+- **Capability:** a server-registered, permission-checked operation that a validated working may request.
 
-The spell may additionally declare a minimum caster rank. This represents knowledge, control, or a special prerequisite that cannot be bypassed merely by having a powerful medium.
+A grimoire is a useful authoring and storage tool, not a key that grants knowledge. A player who remembers a language can recreate its definition without the original book. However, language-definition data and saved programs do not magically follow the player between worlds: unless a carrier or an explicit transfer mechanism is brought over, they must be recreated in the new world.
 
-## 2. Initial rank ladder
+## 2. Magical design vocabulary
 
-| Rank | Name | Intended progression |
-|---:|---|---|
-| 0 | Novice | Basic magical awareness and simple cantrips |
-| 1 | Apprentice | Elementary spells and basic tools |
-| 2 | Adept | Reliable exploration, utility, and crafting magic |
-| 3 | Expert | Complex effects and multi-step spells |
-| 4 | Master | Advanced spell structures and large-area effects |
-| 5 | Archmage | High-order magic, advanced rituals, space manipulation research |
-| 6 | Sovereign | Exceptional world-scale magic and dimension projects |
+Player-facing design should use magical concepts rather than electronics terminology.
 
-These names and boundaries are data-driven design defaults, not final balance values. Spell rank, required caster rank, resource cost, and medium capacity remain independent fields.
+| Concept | Meaning |
+|---|---|
+| Rune | A symbol expressing a defined magical concept or operation |
+| Invocation | An expressed intent, command, or condition |
+| Glyph | A mark describing structure or a relationship |
+| Mana vein | A magical pathway carrying mana or typed magical information |
+| Nexus | A point where flows meet, divide, or transform |
+| Ward | A boundary or constraint around part of a working |
+| Sigil | A mark identifying a target, location, state, or role |
+| Core | A central structure coordinating a working |
+| Weave | The complete connected magical construction |
 
-## 3. Casting media
+These are extensible semantic building blocks, not a fixed spell list. A rune does not equal one spell. Its meaning is defined, and different valid arrangements can produce different workings. Player-created rune systems must declare how their symbols map to canonical concepts; unknown or ambiguous meanings are rejected rather than guessed.
 
-### Grimoire / spellbook
-- Stores learned spells, notes, diagrams, language definitions, and spell source.
-- Provides the primary interface for browsing, studying, editing, compiling, and organizing spells.
-- A normal grimoire is not automatically a casting focus. It does not directly cast a spell unless a special book explicitly has a casting capability.
-- Advanced books may contain multiple volumes, modules, annotations, and ritual instructions.
+The internal implementation may use typed graphs and validation algorithms, but those are implementation details. Player-facing UI, documentation, item names, and in-world visuals should speak in terms of magical construction.
+
+## 3. The weave is independent of its host
+
+An Arcane Weave is a logical structure. It is not inherently a ground circle, a book, a weapon, or a block.
+
+A Host is a physical carrier that exposes supported attachment points, capacity, interfaces, persistence, and connection rules. An installation binds one or more weave fragments to one or more hosts.
+
+Supported host families should be extensible rather than hard-coded:
+
+- **Pages:** a page can bear a fragment; multiple pages may form a larger grimoire construction.
+- **Items:** a weave may be inscribed on a surface, embedded internally, or attached through a supported interface.
+- **Blocks:** a block may contain a construction, expose anchors, receive mana, or connect to neighbouring hosts.
+- **Structures:** multiple items and blocks may form one distributed working.
+
+Host constraints affect what can be installed and sustained: available space, material compatibility, supported interfaces, stability, mana supply, distance, loaded state, and connection integrity. The same logical weave may be adapted to different hosts, but an installation must validate the actual host capabilities.
+
+A **magic circle** is one spatial or ritual host arrangement. It is not another name for every weave and is not required for ordinary item-, page-, or block-based magic.
+
+## 4. Weave structure and validation
+
+The logical structure must support, where appropriate:
+
+- typed magical inputs and outputs;
+- runes and glyphs with declared semantics;
+- mana and information pathways;
+- conditional paths and convergence;
+- bounded repetition;
+- parallel branches with explicit synchronization;
+- reusable sub-weaves and modules;
+- parameters and declared effects;
+- fragments distributed across multiple hosts.
+
+Validation must establish that references and ports exist, types are compatible, required inputs are supplied, branches are well-formed, repetition is bounded, all required fragments are present, and host interfaces can realize the installation. A valid structure still does not gain arbitrary world powers: its outputs resolve only to registered capabilities.
+
+Execution must be bounded by explicit operation, resource, time, and world-access budgets. Client rendering is never authoritative.
+
+## 5. Caster control, complexity, and media
+
+Caster rank is a coarse measure of magical control and the complexity a caster can reliably sustain. It is not a knowledge unlock and must not be represented as a per-spell learning requirement.
+
+Keep independent:
+- **Weave complexity:** structural and control demands of the working.
+- **Caster control:** the complexity the caster can reliably manage.
+- **Mana supply:** available energy and delivery rate.
+- **Host capacity:** structural load and interface limits of installed carriers.
+- **Stability:** whether the combined working can remain coherent.
+
+A more experienced caster can use simpler workings. A large mana reserve does not automatically provide control over a complex weave, and a powerful caster cannot force an unsuitable host to carry a construction beyond its capacity.
+
+### Grimoire
+Stores source, notes, diagrams, language definitions, and weave fragments. Each page may itself be a host. A book can connect page fragments into a larger authored construction, but storage does not automatically mean direct casting capability.
 
 ### Focus crystal
-- A non-weapon magical focus for stabilizing and directing a spell.
-- Its quality may improve precision or support a limited spell rank.
-- It does not grant the holder knowledge or caster rank.
+A non-weapon focus for stabilizing or directing a working. Quality may affect precision, stability, and supported control load. It grants no knowledge.
 
 ### Scroll
-- A prepared, usually consumable spell carrier.
-- Stores a compiled and validated spell payload.
-- The user still needs to satisfy the scroll's activation requirements unless the scroll explicitly contains a permitted release mechanism.
-- Imported or player-authored scroll data must be revalidated by the server.
+A prepared carrier containing a validated, usually consumable working or fragment. The server revalidates imported data and activation conditions.
 
 ### Magic circle
-- A ritual anchor, not simply a larger focus crystal.
-- Defines geometry, participants, anchors, materials, and staged conditions.
-- Supports effects that are too long-running, spatially extensive, or resource-intensive for ordinary direct casting.
-- May distribute eligible costs and roles across participants, but must not silently bypass each participant's permissions or ritual requirements.
+A spatial ritual arrangement with anchors, participants, materials, and staged conditions. It is one host/installation form for workings that need spatial extent or coordinated ritual stages.
 
-Later media may include rings, talismans, catalysts, relics, magical machines, and innate casting. Each must declare its function rather than receiving an unrestricted generic bonus.
+No wand or staff is part of this design baseline.
 
-## 4. Casting modes
-- **Direct:** one caster invokes a spell through a compatible direct-casting medium.
-- **Ritual:** a prepared circle or other ritual anchor coordinates a multi-stage operation.
-- **Prepared release:** a validated scroll or charged artifact releases a stored effect under explicit activation rules.
-- **Innate:** a future special path for high-rank casters or creatures, with its own limitations and balancing.
+## 6. Server-side authoring and execution pipeline
 
-A grimoire is primarily an authoring and knowledge interface. A magic circle is primarily a ritual interface. They should not be treated as interchangeable items.
+Player-authored source and custom language definitions are untrusted.
 
-## 5. Learning and ownership
+1. The player authors a working in a chosen language or directly in canonical Arcana.
+2. The player's language front end translates it deterministically into canonical Arcana.
+3. The canonical lexer/parser produces the standard representation.
+4. Semantic validation checks types, references, structure, and declared effects.
+5. Weave validation checks graph structure and bounded control flow.
+6. Installation validation checks every host, interface, fragment, and connection.
+7. Capability resolution maps approved outputs to registered server capabilities.
+8. The server checks permissions, targets, world state, mana, materials, cooldowns, and execution budgets.
+9. The bounded runtime executes approved stages and commits permitted world changes.
 
-Possessing a spell source is not identical to understanding the spell.
+Only canonical, validated structures proceed to execution. The server does not need to know which player language produced them.
 
-A spell-learning flow should eventually support:
-1. discover or receive a spell source;
-2. inspect its language, diagrams, prerequisites, and warnings;
-3. decode or study it;
-4. satisfy its knowledge and caster-rank requirements;
-5. practice or complete a research task;
-6. add the spell to a player's learned spell collection.
+## 7. Language and knowledge invariants
 
-Some simple spells may be taught directly. Complex spells may require research, multiple prerequisites, or a complete ritual theory. A book can preserve a spell that its current holder has not yet learned.
-
-## 6. Server-side casting pipeline
-
-1. Player selects a learned spell.
-2. The server resolves the canonical spell identity and version.
-3. The server checks caster rank and spell-specific prerequisites.
-4. The server checks the medium, mode, and medium capacity.
-5. The server checks target, world state, permissions, materials, mana, cooldown, and execution budget.
-6. Resources are reserved.
-7. The server creates a casting or ritual execution record.
-8. The runtime executes bounded stages and commits approved world changes.
-9. The server records success, failure, cancellation, and resource settlement.
-
-Client UI is presentation only. The client never decides that a spell is valid and never performs authoritative world mutation.
-
-## 7. High-rank casting rule
-
-The default direct-casting rank rule is:
-
-    spell rank <= caster rank
-
-The spell's minimum caster rank must also be met, and the medium must support the spell's rank and casting mode.
-
-This naturally permits a Master to cast Apprentice spells without requiring a separate exception for every lower tier. It does not permit an Apprentice to cast a Master spell merely by borrowing a Sovereign's focus crystal.
-
-Special spells may impose additional requirements, such as a particular school, learned prerequisite, ritual role, or world condition. Such requirements must be explicit spell metadata, not hidden exceptions in item code.
+- Every player language targets the same canonical Arcana representation.
+- The server parses only canonical Arcana, never a separate parser per player language.
+- A custom language definition is a tool/data artifact, not knowledge itself.
+- The player's understanding is not stored as a learned-spell whitelist.
+- There is no per-spell learned=true flag or mandatory learned-spell collection.
+- Knowing how to express a working does not bypass structural, resource, permission, host, or capability validation.
+- A language definition saved in a book does not automatically transfer between worlds.
+- Unknown, ambiguous, unsupported, or non-deterministic translations fail closed.
 
 ## 8. Current implementation boundary
 
-dev.arcana.casting.ArcanaCastingRules currently provides a loader-independent rules prototype for:
-- caster rank;
-- spell rank and minimum caster rank;
-- medium kind and maximum supported spell rank;
-- direct versus ritual casting support;
-- compatible medium declarations;
-- structured rejection codes.
+The repository currently contains:
+- a bounded canonical-language lexer/parser and a small canonical AST;
+- a v0.1 translator that maps vocabulary aliases only;
+- static semantic validation;
+- a loader-independent casting-rules prototype;
+- registered grimoire, focus crystal, and scroll items;
+- an initial typed graph prototype in ArcanaCircuit.
 
-It does **not** implement spell storage, inventory interaction, a spellbook GUI, mana consumption, learning, or spell execution. The grimoire, focus crystal, and scroll are currently registered as inert items in the Arcana creative tab.
+The translator does **not** yet support arbitrary grammar productions, word-order changes, inflection, or syntax templates. The graph prototype is an internal technical foundation, not a finished player-facing magical-weave editor. Hosts, installations, cross-host connections, capabilities, mana, persistence, and actual casting are not yet implemented.
 
-## 9. Next vertical slice
+## 9. Development sequence
 
-Implement the first playable loop in this order:
-1. Implement a grimoire screen and persistent spellbook data model for the registered grimoire item.
-2. Add a simple spell collection data model and a few built-in test spells.
-3. Register a basic focus crystal as the first direct-casting medium.
-4. Add a server-authoritative cast request and validation using ArcanaCastingRules.
-5. Add a harmless test spell with a visible effect.
-6. Add a magic-circle block/entity as a ritual anchor only after direct casting works.
-7. Add rank progression and spell learning after the first casting loop is reliable.
+1. Establish the loader-independent magical-weave and host/installation domain model.
+2. Validate typed paths, branch semantics, bounded repetition, reusable fragments, and cross-host connections.
+3. Replace obsolete spell-learning and minimum-caster-rank semantics with control/complexity checks.
+4. Upgrade the language front end from aliases to declarative grammar and deterministic canonical translation.
+5. Build a grimoire editor for source, language definitions, diagrams, diagnostics, and page-hosted fragments.
+6. Implement host adapters for pages, items, and blocks.
+7. Implement a server-authoritative, bounded capability runtime.
+8. Prove one harmless end-to-end working before expanding into complex rituals, structures, and world-scale magic.
 
-The first playable slice should prove that a player can open a book, select a learned spell, use a focus crystal, receive clear rejection reasons when requirements fail, and successfully cast one harmless spell.
+The first playable experience should let a player author a small working, validate it, install it on a suitable host, activate it through a permitted interface, and receive clear diagnostics when any part is invalid.
