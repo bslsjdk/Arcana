@@ -38,7 +38,7 @@ The first implementation branch establishes:
 - unit tests for parsing, translation equivalence, semantic validation, and malformed input;
 - a loader-independent casting-rules prototype;
 - registered grimoire, focus crystal, and scroll items;
-- an initial typed graph prototype, currently an internal foundation rather than a finished magical-weave editor.
+- an immutable standard-symbol registry with concrete typed ports, parameter schemas, control-flow classifications, complexity weights, and capability identifiers; the older free-form graph remains a legacy prototype.
 
 The v0.2 translator supports vocabulary aliases and deterministic token-phrase rules. Phrase rules can expand a short expression into a larger canonical source fragment or compress a longer phrase into a short canonical token. It does **not yet** support arbitrary grammar productions, word-order transformations, inflection, syntax-tree patterns, or context-sensitive disambiguation. The semantic validator is static analysis only: it does not execute capabilities or mutate the Minecraft world.
 
