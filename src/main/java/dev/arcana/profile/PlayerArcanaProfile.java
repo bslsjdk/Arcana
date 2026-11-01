@@ -1,5 +1,8 @@
 package dev.arcana.profile;
 
+import dev.arcana.casting.CastingTriggerRecognizer;
+import dev.arcana.language.ArcanaLanguage;
+
 import java.util.Objects;
 
 /**
