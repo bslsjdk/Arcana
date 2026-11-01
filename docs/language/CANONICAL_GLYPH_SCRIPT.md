@@ -176,10 +176,19 @@ A branch must own exactly the two named arms `whenTrue` and `whenFalse`. A bound
 The direct script codec now serializes regions with declarations of this form:
 
 ```text
-^repeatBody(repeat.body)[bodyStart>bodyEnd](bodyStart,work,bodyEnd)@-;
-^nestedArm(branch.whenTrue)[innerStart>innerEnd](innerStart,innerEnd)@outerArm;
+^repeatBody(repeat.body)[bodyStart>bodyEnd.flow](bodyStart,work,bodyEnd)@-;
+^nestedArm(branch.whenTrue)[innerStart>innerEnd.flow](innerStart,innerEnd)@outerArm;
 ```
 
 The parent marker `-` means a top-level region; otherwise it names the containing region. Member IDs are explicit and ordered. These declarations are metadata for structural ownership, not a claim that branch/repeat runtime execution is already implemented.
 
 This milestone establishes **structural containment**, not a complete control-flow interpreter. The next required step is to validate boundary connections and define the exact execution contract for branch selection, repeat iteration, body completion, and loop exit. Until that exists, region-aware canonical weaves can be validated and serialized but must not be executed.
+
+
+### Region boundary contract
+
+Region declarations include an explicit exit port: `[entryGlyph>exitGlyph.exitPort]`. The entry glyph must be a standard `arcana:control/entry`; the owning branch/repeat output must connect directly to its `flow` input. Its input is optional so the same standard entry glyph can also serve as the top-level starting point.
+
+A repeat body's exit is a terminal SIGNAL boundary captured by the bounded-repeat controller. It cannot jump directly outside the body. A branch arm must connect its declared exit SIGNAL to a standard `arcana:control/join` input. Both arms must converge on the same join and use its distinct `left` and `right` inputs. Other SIGNAL control-flow edges may not cross region boundaries. Typed non-SIGNAL data connections may cross a region boundary as captured inputs.
+
+This makes branch/repeat ownership and entry/exit wiring statically checkable. It still does not implement runtime scheduling or effect execution.
