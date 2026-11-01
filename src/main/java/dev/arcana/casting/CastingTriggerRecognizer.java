@@ -9,8 +9,10 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * Recognizes player-defined activation and cancellation phrases embedded in an
- * incantation. This class is deliberately independent of Minecraft and does
+ * Recognizes player-defined activation and cancellation phrases for ordinary
+ * voice-command input only. Never pass text entered through the dedicated
+ * casting window to this recognizer: in that mode trigger words are ordinary
+ * player-language content. This class is independent of Minecraft and does
  * not start, stop, or execute a cast.
  */
 public final class CastingTriggerRecognizer {
