@@ -2,15 +2,16 @@
 
 Status: **design baseline; the current rank rules and registered media are prototypes, not a playable casting system**
 
-Arcana is a system for creating magic, not selecting spells from a fixed catalogue. Players learn magical principles and construct their own workings from runes, glyphs, invocations, patterns, and mana pathways. The same construction can serve combat, tools, equipment, rituals, machines, buildings, and environmental interactions.
+Arcana is a system for creating magic, not selecting spells from a fixed catalogue. Players learn magical principles and construct their own workings from Arcana-defined standard symbols, invocations, patterns, and mana pathways. The same construction can serve combat, tools, equipment, rituals, machines, buildings, and environmental interactions.
 
 ## 1. Core concepts
 
 Keep these concepts separate:
 
 - **Player knowledge:** what the player understands and can recreate. Knowledge belongs to the player, not to a world-side spell unlock database.
-- **Language definition:** the player's custom vocabulary, symbols, grammar, word order, and inflection rules. It is data stored in a carrier such as a grimoire; it is not the player's knowledge itself.
-- **Arcana canonical language:** the one standard representation understood by the server.
+- **Player language definition:** the player's custom vocabulary, grammar, word order, affixes, phrase patterns, and deterministic translation rules. It is data stored in a carrier such as a grimoire; it is not the player's knowledge itself.
+- **Arcana standard symbol system:** the single Arcana-defined registry of canonical symbols, operations, ports, and semantics. Players may reference and compose these symbols but cannot create new underlying symbols or redefine their meanings.
+- **Canonical representation:** the versioned standard syntax/AST understood by the server and produced by every player-language front end.
 - **Magical working:** the actual program or structure authored by the player.
 - **Arcane weave:** the structured magical arrangement that describes relationships, flow, conditions, branches, repetition, and composition.
 - **Host / carrier:** the item, block, page, or structure that physically bears some or all of a weave.
@@ -20,23 +21,21 @@ A grimoire is a useful authoring and storage tool, not a key that grants knowled
 
 ## 2. Magical design vocabulary
 
-Player-facing design should use magical concepts rather than electronics terminology.
+Player-facing design should use magical concepts rather than electronics terminology. The symbols and meanings in this vocabulary are defined by Arcana, not invented by individual players.
 
 | Concept | Meaning |
 |---|---|
-| Rune | A symbol expressing a defined magical concept or operation |
-| Invocation | An expressed intent, command, or condition |
-| Glyph | A mark describing structure or a relationship |
+| Rune / standard symbol | An Arcana-registered symbol with a fixed, defined magical meaning or operation |
+| Invocation | A standard semantic role expressing intent, command, or condition |
+| Glyph | The canonical symbol or its visual inscription in a magical construction; not a user-defined semantic primitive |
 | Mana vein | A magical pathway carrying mana or typed magical information |
-| Nexus | A point where flows meet, divide, or transform |
-| Ward | A boundary or constraint around part of a working |
-| Sigil | A mark identifying a target, location, state, or role |
-| Core | A central structure coordinating a working |
+| Nexus | An Arcana-defined point where flows meet, divide, or transform |
+| Ward | An Arcana-defined boundary or constraint around part of a working |
+| Sigil | An Arcana-defined mark identifying a target, location, state, or role |
+| Core | An Arcana-defined structure coordinating a working |
 | Weave | The complete connected magical construction |
 
-These are extensible semantic building blocks, not a fixed spell list. A rune does not equal one spell. Its meaning is defined, and different valid arrangements can produce different workings. Player-created rune systems must declare how their symbols map to canonical concepts; unknown or ambiguous meanings are rejected rather than guessed.
-
-The internal implementation may use typed graphs and validation algorithms, but those are implementation details. Player-facing UI, documentation, item names, and in-world visuals should speak in terms of magical construction.
+These are standard semantic building blocks, not a fixed spell list. Players freely compose them into new workings, but composition does not grant permission to invent new primitive meanings. The internal implementation may use typed graphs and validation algorithms; those are implementation details. Player-facing UI, documentation, item names, and in-world visuals should speak in terms of magical construction.
 
 ## 3. The weave is independent of its host
 
@@ -59,8 +58,7 @@ A **magic circle** is one spatial or ritual host arrangement. It is not another 
 
 The logical structure must support, where appropriate:
 
-- typed magical inputs and outputs;
-- runes and glyphs with declared semantics;
+- references to Arcana-registered standard symbols and their fixed typed inputs/outputs;
 - mana and information pathways;
 - conditional paths and convergence;
 - bounded repetition;
@@ -69,7 +67,9 @@ The logical structure must support, where appropriate:
 - parameters and declared effects;
 - fragments distributed across multiple hosts.
 
-Validation must establish that references and ports exist, types are compatible, required inputs are supplied, branches are well-formed, repetition is bounded, all required fragments are present, and host interfaces can realize the installation. A valid structure still does not gain arbitrary world powers: its outputs resolve only to registered capabilities.
+Validation must establish that symbol references exist in the Arcana registry, ports and types are compatible, required inputs are supplied, branches are well-formed, repetition is bounded, all required fragments are present, and host interfaces can realize the installation. A valid structure still does not gain arbitrary world powers: its outputs resolve only to registered capabilities.
+
+Validation must reject unknown standard-symbol IDs. Player language rules may only emit registered canonical IDs or canonical AST templates; they cannot register symbols, ports, operations, or semantic definitions.
 
 Execution must be bounded by explicit operation, resource, time, and world-access budgets. Client rendering is never authoritative.
 
@@ -78,11 +78,13 @@ Execution must be bounded by explicit operation, resource, time, and world-acces
 Caster rank is a coarse measure of magical control and the complexity a caster can reliably sustain. It is not a knowledge unlock and must not be represented as a per-spell learning requirement.
 
 Keep independent:
-- **Weave complexity:** structural and control demands of the working.
+- **Canonical weave complexity:** structural and control demands of the translated working.
 - **Caster control:** the complexity the caster can reliably manage.
 - **Mana supply:** available energy and delivery rate.
 - **Host capacity:** structural load and interface limits of installed carriers.
 - **Stability:** whether the combined working can remain coherent.
+
+The player's source-language length has no direct relationship to magic cost. A long expression may translate to one standard symbol; a short expression may expand to a large canonical structure. Mana cost, control requirements, and structural capacity are calculated only after deterministic translation, from the canonical structure and its declared operations/effects. Source length, token count, expansion depth, and translation work have separate technical limits solely to prevent resource exhaustion.
 
 A more experienced caster can use simpler workings. A large mana reserve does not automatically provide control over a complex weave, and a powerful caster cannot force an unsuitable host to carry a construction beyond its capacity.
 
@@ -105,10 +107,10 @@ No wand or staff is part of this design baseline.
 Player-authored source and custom language definitions are untrusted.
 
 1. The player authors a working in a chosen language or directly in canonical Arcana.
-2. The player's language front end translates it deterministically into canonical Arcana.
+2. The player's language front end translates it deterministically into registered canonical symbols and/or canonical Arcana syntax.
 3. The canonical lexer/parser produces the standard representation.
 4. Semantic validation checks types, references, structure, and declared effects.
-5. Weave validation checks graph structure and bounded control flow.
+5. Weave validation checks symbol registry references, graph structure, and bounded control flow.
 6. Installation validation checks every host, interface, fragment, and connection.
 7. Capability resolution maps approved outputs to registered server capabilities.
 8. The server checks permissions, targets, world state, mana, materials, cooldowns, and execution budgets.
@@ -118,12 +120,17 @@ Only canonical, validated structures proceed to execution. The server does not n
 
 ## 7. Language and knowledge invariants
 
-- Every player language targets the same canonical Arcana representation.
+- Every player language targets the same Arcana-owned canonical representation.
+- The standard symbol registry and symbol semantics are defined only by Arcana.
+- Players may define arbitrary language expressions and deterministic mappings, but mappings may target only registered canonical symbols/operations or valid canonical AST templates.
+- Players cannot introduce new underlying magical symbols, ports, primitive operations, or semantic meanings.
 - The server parses only canonical Arcana, never a separate parser per player language.
 - A custom language definition is a tool/data artifact, not knowledge itself.
 - The player's understanding is not stored as a learned-spell whitelist.
 - There is no per-spell learned=true flag or mandatory learned-spell collection.
 - Knowing how to express a working does not bypass structural, resource, permission, host, or capability validation.
+- Magic cost and control requirements depend on the translated canonical structure, not source-language character or word count.
+- Source and expansion limits are technical anti-abuse limits, not magic-cost rules.
 - A language definition saved in a book does not automatically transfer between worlds.
 - Unknown, ambiguous, unsupported, or non-deterministic translations fail closed.
 
@@ -137,16 +144,16 @@ The repository currently contains:
 - registered grimoire, focus crystal, and scroll items;
 - an initial ArcaneWeave domain model with typed magical essences, mana veins, host anchors, placements, and explicit links between hosts.
 
-The older ArcanaCircuit graph is a legacy technical prototype and is not the player-facing design vocabulary.
+The current ArcaneWeave prototype still models glyph kinds and typed ports directly in its domain records. It is an internal structural prototype, **not yet the final registry-backed standard-symbol model**. The next implementation step must replace free-form semantic glyph definitions with references to Arcana-owned standard symbol definitions. The translator does **not** yet support arbitrary grammar productions, word-order changes, inflection, or syntax templates. Hosts, installations, cross-host connections, capabilities, mana, persistence, and actual casting are not yet implemented.
 
-The translator does **not** yet support arbitrary grammar productions, word-order changes, inflection, or syntax templates. The graph prototype is an internal technical foundation, not a finished player-facing magical-weave editor. Hosts, installations, cross-host connections, capabilities, mana, persistence, and actual casting are not yet implemented.
+The older ArcanaCircuit graph is a legacy technical prototype and is not the player-facing design vocabulary.
 
 ## 9. Development sequence
 
-1. Establish the loader-independent magical-weave and host/installation domain model.
-2. Validate typed paths, branch semantics, bounded repetition, reusable fragments, and cross-host connections.
+1. Replace free-form glyph semantic definitions with references to an Arcana-owned standard symbol registry.
+2. Validate typed paths, branch semantics, bounded repetition, reusable fragments, and cross-host connections against that registry.
 3. Replace obsolete spell-learning and minimum-caster-rank semantics with control/complexity checks.
-4. Upgrade the language front end from aliases to declarative grammar and deterministic canonical translation.
+4. Upgrade the language front end from aliases to deterministic phrase/grammar translation that can emit only registered canonical symbols or valid canonical AST templates.
 5. Build a grimoire editor for source, language definitions, diagrams, diagnostics, and page-hosted fragments.
 6. Implement host adapters for pages, items, and blocks.
 7. Implement a server-authoritative, bounded capability runtime.
