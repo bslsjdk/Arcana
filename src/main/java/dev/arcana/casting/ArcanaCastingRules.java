@@ -71,8 +71,8 @@ public final class ArcanaCastingRules {
 
     public enum MediumKind {
         GRIMOIRE,
-        WAND,
-        STAFF,
+        FOCUS_CRYSTAL,
+        
         SCROLL,
         MAGIC_CIRCLE
     }
