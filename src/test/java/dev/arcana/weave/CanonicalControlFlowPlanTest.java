@@ -68,7 +68,7 @@ class CanonicalControlFlowPlanTest {
         var result = CanonicalControlFlowPlan.compile(weave, registry);
 
         assertTrue(result.successful(), () -> result.diagnostics().toString());
-        assertEquals(List.of("root", "after"), result.plan().rootEntryGlyphs());
+        assertEquals(List.of("root"), result.plan().rootEntryGlyphs());
         var repeat = result.plan().repeats().getFirst();
         assertEquals(7, repeat.maximumIterations());
         assertEquals("bodyRegion", repeat.bodyRegionId());
