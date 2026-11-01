@@ -192,3 +192,14 @@ Region declarations include an explicit exit port: `[entryGlyph>exitGlyph.exitPo
 A repeat body's exit is a terminal SIGNAL boundary captured by the bounded-repeat controller. It cannot jump directly outside the body. A branch arm must connect its declared exit SIGNAL to a standard `arcana:control/join` input. Both arms must converge on the same join and use its distinct `left` and `right` inputs. Other SIGNAL control-flow edges may not cross region boundaries. Typed non-SIGNAL data connections may cross a region boundary as captured inputs.
 
 This makes branch/repeat ownership and entry/exit wiring statically checkable. It still does not implement runtime scheduling or effect execution.
+
+
+## 12. Deterministic control-flow plan
+
+`CanonicalControlFlowPlan.compile(weave, registry)` is the first compiler stage after structural validation. It refuses invalid weaves and produces an immutable, deterministically ordered plan containing root entries, control regions, branch plans, bounded-repeat plans, and typed connections.
+
+A branch plan captures its boolean condition source, the true and false region IDs, and the common join plus the distinct input used by each arm. The join is a **merge**, not a barrier: because the arms are mutually exclusive, runtime execution must continue when the selected arm reaches its corresponding join input. It must never wait for the inactive arm.
+
+A repeat plan captures the validated maximum iteration count, body region, and optional completion continuation. The runtime contract is to enter the body no more than that many times, capture the body exit at the repeat boundary, and emit completion only after the loop terminates.
+
+The plan is intentionally data-only. It does not evaluate expressions, schedule nodes, spend mana, or invoke world capabilities. Those remain separate runtime stages and must not be implied by successful compilation.
