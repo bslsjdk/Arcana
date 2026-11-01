@@ -545,7 +545,6 @@ public final class ArcaneWeave {
         }
 
         for (CanonicalGlyph glyph : glyphsById.values()) {
-            if (glyph.symbolId().equals("arcana:control:unused")) continue;
             if (glyph.symbolId().equals("arcana:control/branch")) {
                 Set<String> ports = portsByOwner.getOrDefault(glyph.instanceId(), Set.of());
                 if (!ports.containsAll(Set.of("whenTrue", "whenFalse"))) {
