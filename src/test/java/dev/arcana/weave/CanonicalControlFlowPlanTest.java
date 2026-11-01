@@ -67,6 +67,7 @@ class CanonicalControlFlowPlanTest {
         ));
 
         var result = CanonicalControlFlowPlan.compile(weave, registry);
+        System.out.println("REPEAT_PLAN_DIAGNOSTICS=" + result.diagnostics());
 
         assertTrue(result.successful(), () -> result.diagnostics().toString());
         assertEquals(List.of("root"), result.plan().rootEntryGlyphs());
