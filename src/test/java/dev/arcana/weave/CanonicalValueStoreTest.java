@@ -121,6 +121,22 @@ class CanonicalValueStoreTest {
     }
 
     @Test
+    void failedBudgetReleaseDoesNotDeleteStoredValues() {
+        var budget = budget(2);
+        var weave = new ArcaneWeave.CanonicalWeave("arcana:transactional_cleanup", 1, List.of(
+                glyph("number", "arcana:reference/number", Map.of("value", "1"))
+        ));
+        var store = new CanonicalValueStore(weave, registry, budget);
+        store.writeOutput("number", "number", new CanonicalValueStore.NumberValue("1"));
+
+        // Simulate external accounting corruption; cleanup must not partially mutate the store.
+        budget.releaseRuntimeValues(1);
+        assertEquals(CanonicalValueStore.Status.INVALID_REQUEST,
+                store.clearGlyph("number").status());
+        assertEquals(1, store.snapshot().size());
+    }
+
+    @Test
     void inputResolutionRequiresAnExplicitConnection() {
         var weave = new ArcaneWeave.CanonicalWeave("arcana:entry", 1, List.of(
                 glyph("entry", "arcana:control/entry", Map.of())
