@@ -63,7 +63,7 @@ public final class CanonicalControlFlowPlan {
                 branches.add(new BranchPlan(glyph.instanceId(),
                         condition.fromGlyph(), condition.fromPort(),
                         trueArm.id(), falseArm.id(), trueExit.toGlyph(),
-                        trueExit.toPort(), falseExit.toPort()));
+                        trueExit.toPort(), falseExit.toPort(), JoinSemantics.SELECTED_ARM_MERGE));
             } else if (glyph.symbolId().equals("arcana:control/repeat")) {
                 ArcaneWeave.CanonicalRegion body = findRegion(regions, glyph.instanceId(), "body");
                 ArcaneWeave.CanonicalConnection completed = connections.stream()
@@ -122,10 +122,15 @@ public final class CanonicalControlFlowPlan {
         public RegionPlan { memberGlyphs = List.copyOf(memberGlyphs); }
     }
 
+    public enum JoinSemantics { SELECTED_ARM_MERGE }
+
     public record BranchPlan(String ownerGlyph, String conditionSourceGlyph,
                              String conditionSourcePort, String trueRegionId,
                              String falseRegionId, String joinGlyph,
-                             String trueJoinPort, String falseJoinPort) { }
+                             String trueJoinPort, String falseJoinPort,
+                             JoinSemantics joinSemantics) {
+        public BranchPlan { Objects.requireNonNull(joinSemantics, "joinSemantics"); }
+    }
 
     public record RepeatPlan(String ownerGlyph, int maximumIterations,
                              String bodyRegionId, String completionTargetGlyph,
