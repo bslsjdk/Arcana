@@ -53,7 +53,8 @@ A reference is not permission to mutate the referenced object. Every world read/
 | Symbol ID | Inputs | Outputs | Meaning |
 |---|---|---|---|
 | `arcana:data/add` | `left:NUMBER`, `right:NUMBER` | `result:NUMBER` | Adds two finite numbers |
-| `arcana:data/compare` | `left:NUMBER`, `right:NUMBER` | `result:BOOLEAN` | Compares two finite numbers; comparison operator still needs an explicit typed parameter before execution |
+| `arcana:data/equal` | `left:NUMBER`, `right:NUMBER` | `result:BOOLEAN` | Tests numeric equality |
+| `arcana:data/less_than` | `left:NUMBER`, `right:NUMBER` | `result:BOOLEAN` | Tests whether the first number is less than the second |
 
 ### Perception
 
@@ -94,7 +95,7 @@ This inventory is not a complete magic system. Before adding more symbols, the f
 - whether control flow and value flow are separate connection domains;
 - how multi-result entity queries are represented without hidden nondeterminism;
 - how a join knows whether it waits for both branches or accepts the first;
-- how comparison operators are encoded and type-checked;
+- whether additional comparison operators should be added as separate concrete symbols;
 - how positions are bounded to dimensions, loaded chunks, and permitted ranges;
 - how mana sources, storage capacity, rates, and losses are represented;
 - how ward policies are authored from existing registered predicates;
