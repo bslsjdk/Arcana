@@ -44,6 +44,7 @@ The first implementation branch establishes:
 - a versioned canonical script character table and structured direct-writing codec that round-trips validated canonical weaves;
 - explicit branch-arm and bounded-repeat body regions, with nested-region containment, boundary membership, sibling-overlap, and parent-cycle validation;
 - explicit region entry/exit wiring, branch convergence through a shared join, repeat-body exit capture, and rejection of control-port fanout or boundary escapes;
+- deterministic validated control-flow plan compilation for root entries, mutually exclusive branch arms, shared joins, bounded repeat bodies, and completion continuations (plan only; no runtime execution yet);
 - the older free-form graph retained only as a legacy prototype.
 
 The v0.2 translator supports vocabulary aliases and deterministic token-phrase rules. Phrase rules can expand a short expression into a larger canonical source fragment or compress a longer phrase into a short canonical token. It does **not yet** support arbitrary grammar productions, word-order transformations, inflection, syntax-tree patterns, or context-sensitive disambiguation. The semantic validator is static analysis only: it does not execute capabilities or mutate the Minecraft world.
