@@ -73,9 +73,12 @@ public final class CanonicalNodeEvaluator {
                 default -> failure(Status.UNSUPPORTED_SYMBOL, glyphId,
                         "No pure-data evaluator is registered for this standard symbol.");
             };
-        } catch (NumberFormatException | IllegalArgumentException ex) {
+        } catch (NumberFormatException ex) {
             return failure(Status.INVALID_PARAMETER, glyphId,
-                    "A numeric parameter or runtime value is invalid: " + safeMessage(ex));
+                    "A numeric parameter is invalid: " + safeMessage(ex));
+        } catch (IllegalArgumentException ex) {
+            return failure(Status.INVALID_RESULT, glyphId,
+                    "The operation produced a value outside the supported runtime limits.");
         } catch (ArithmeticException ex) {
             return failure(Status.INVALID_RESULT, glyphId,
                     "The operation produced a value outside the supported numeric range.");
