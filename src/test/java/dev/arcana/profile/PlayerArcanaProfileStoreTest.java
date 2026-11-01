@@ -96,6 +96,15 @@ class PlayerArcanaProfileStoreTest {
     }
 
     @Test
+    void malformedJsonAndNonCanonicalUuidsAreRejected() {
+        assertThrows(IllegalArgumentException.class,
+                () -> PlayerArcanaProfileStore.decode("{broken"));
+        assertThrows(IllegalArgumentException.class,
+                () -> PlayerArcanaProfileStore.decode(
+                        "{\\"schemaVersion\\":1,\\"profiles\\":{\\"1-1-1-1-1\\":{}}}"));
+    }
+
+    @Test
     void nullPlayerIdsAndProfilesAreRejected() {
         var store = new PlayerArcanaProfileStore();
         assertThrows(IllegalArgumentException.class, () -> store.get(null));
