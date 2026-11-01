@@ -102,6 +102,112 @@ class CanonicalWeaveSchedulerTest {
         assertEquals(1, second.evaluator().budgetSnapshot().nodeSteps());
     }
 
+    @Test
+    void branchTrueExecutesOnlyTrueArmAndMergesWithoutWaitingForFalseArm() {
+        var result = scheduler(branchWeave("arcana:branch_true", "1", "1"), budget(20, 8)).execute();
+
+        assertEquals(CanonicalWeaveScheduler.Status.COMPLETED, result.status());
+        assertTrue(result.evaluationOrder().contains("yes"));
+        assertFalse(result.evaluationOrder().contains("no"));
+        assertEquals(1, result.evaluationOrder().stream().filter("join"::equals).count());
+    }
+
+    @Test
+    void branchFalseExecutesOnlyFalseArmAndMergesWithoutWaitingForTrueArm() {
+        var result = scheduler(branchWeave("arcana:branch_false", "1", "2"), budget(20, 8)).execute();
+
+        assertEquals(CanonicalWeaveScheduler.Status.COMPLETED, result.status());
+        assertFalse(result.evaluationOrder().contains("yes"));
+        assertTrue(result.evaluationOrder().contains("no"));
+        assertEquals(1, result.evaluationOrder().stream().filter("join"::equals).count());
+    }
+
+    @Test
+    void repeatExecutesExactlyDeclaredIterationsThenContinues() {
+        var weave = repeatWeave("arcana:repeat_three", 3);
+        var result = scheduler(weave, budget(20, 4)).execute();
+
+        assertEquals(CanonicalWeaveScheduler.Status.COMPLETED, result.status());
+        assertEquals(3, result.evaluationOrder().stream().filter("body"::equals).count());
+        assertEquals(1, result.evaluationOrder().stream().filter("after"::equals).count());
+        assertEquals(0, result.budget().regionDepth());
+        assertTrue(result.budget().loopIterations().isEmpty());
+    }
+
+    @Test
+    void repeatOneExecutesBodyOnce() {
+        var result = scheduler(repeatWeave("arcana:repeat_one", 1), budget(8, 2)).execute();
+
+        assertEquals(CanonicalWeaveScheduler.Status.COMPLETED, result.status());
+        assertEquals(1, result.evaluationOrder().stream().filter("body"::equals).count());
+        assertTrue(result.evaluationOrder().contains("after"));
+    }
+
+    @Test
+    void repeatBudgetFailureReleasesRegionAndLoopAccounting() {
+        var result = scheduler(repeatWeave("arcana:repeat_budget", 3), budget(2, 2)).execute();
+
+        assertEquals(CanonicalWeaveScheduler.Status.BUDGET_EXHAUSTED, result.status());
+        assertEquals(0, result.budget().regionDepth());
+        assertTrue(result.budget().loopIterations().isEmpty());
+        assertFalse(result.evaluationOrder().contains("after"));
+    }
+
+    @Test
+    void cancellationIsReportedWithoutClaimingCompletion() {
+        var weave = new ArcaneWeave.CanonicalWeave("arcana:cancelled", 1, List.of(
+                glyph("value", "arcana:reference/number", Map.of("value", "9"))
+        ));
+        var result = scheduler(weave, budget(4, 2)).execute(() -> true);
+
+        assertEquals(CanonicalWeaveScheduler.Status.CANCELLED, result.status());
+        assertTrue(result.evaluationOrder().isEmpty());
+        assertEquals(0, result.budget().nodeSteps());
+    }
+
+    private ArcaneWeave.CanonicalWeave branchWeave(String id, String left, String right) {
+        return new ArcaneWeave.CanonicalWeave(id, 1, List.of(
+                glyph("root", "arcana:control/entry", Map.of()),
+                glyph("one", "arcana:reference/number", Map.of("value", left)),
+                glyph("two", "arcana:reference/number", Map.of("value", right)),
+                glyph("condition", "arcana:data/equal", Map.of()),
+                glyph("branch", "arcana:control/branch", Map.of()),
+                glyph("yes", "arcana:control/entry", Map.of()),
+                glyph("no", "arcana:control/entry", Map.of()),
+                glyph("join", "arcana:control/join", Map.of())
+        ), List.of(
+                edge("root", "flow", "branch", "flow"),
+                edge("one", "number", "condition", "left"),
+                edge("two", "number", "condition", "right"),
+                edge("condition", "result", "branch", "condition"),
+                edge("branch", "whenTrue", "yes", "flow"),
+                edge("branch", "whenFalse", "no", "flow"),
+                edge("yes", "flow", "join", "left"),
+                edge("no", "flow", "join", "right")
+        ), List.of(
+                new ArcaneWeave.CanonicalRegion("trueArm", "branch", "whenTrue",
+                        "yes", "yes", "flow", List.of("yes"), null),
+                new ArcaneWeave.CanonicalRegion("falseArm", "branch", "whenFalse",
+                        "no", "no", "flow", List.of("no"), null)
+        ));
+    }
+
+    private ArcaneWeave.CanonicalWeave repeatWeave(String id, int count) {
+        return new ArcaneWeave.CanonicalWeave(id, 1, List.of(
+                glyph("root", "arcana:control/entry", Map.of()),
+                glyph("repeat", "arcana:control/repeat", Map.of("maxIterations", Integer.toString(count))),
+                glyph("body", "arcana:control/entry", Map.of()),
+                glyph("after", "arcana:control/entry", Map.of())
+        ), List.of(
+                edge("root", "flow", "repeat", "flow"),
+                edge("repeat", "body", "body", "flow"),
+                edge("repeat", "completed", "after", "flow")
+        ), List.of(
+                new ArcaneWeave.CanonicalRegion("bodyRegion", "repeat", "body",
+                        "body", "body", "flow", List.of("body"), null)
+        ));
+    }
+
     private CanonicalWeaveScheduler scheduler(
             ArcaneWeave.CanonicalWeave weave, CanonicalExecutionBudget.Session budget) {
         var compilation = CanonicalControlFlowPlan.compile(weave, registry);
