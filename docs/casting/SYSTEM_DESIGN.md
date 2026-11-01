@@ -142,15 +142,16 @@ The repository currently contains:
 - static semantic validation;
 - a loader-independent casting-rules prototype where rank represents control capacity, not knowledge;
 - registered grimoire, focus crystal, and scroll items;
-- an initial ArcaneWeave domain model with typed magical essences, mana veins, host anchors, placements, and explicit links between hosts.
+- an ArcaneWeave model with a registry of concrete standard-symbol contracts, typed ports, parameter schemas, complexity weights, and capability identifiers;
+- a separate legacy free-form graph model retained for structural tests and migration work.
 
-The current ArcaneWeave prototype still models glyph kinds and typed ports directly in its domain records. It is an internal structural prototype, **not yet the final registry-backed standard-symbol model**. The next implementation step must replace free-form semantic glyph definitions with references to Arcana-owned standard symbol definitions. The translator does **not** yet support arbitrary grammar productions, word-order changes, inflection, or syntax templates. Hosts, installations, cross-host connections, capabilities, mana, persistence, and actual casting are not yet implemented.
+The registry now defines concrete control, data, perception, mana, reference, constraint, and effect symbols. The former nine English IDs remain non-instantiable family headings. The registry is not yet connected to a complete graph validator or runtime, and capability identifiers do not imply implemented world operations. The translator does **not** yet support arbitrary grammar productions, word-order changes, inflection, or syntax templates. Hosts, installations, cross-host connections, capabilities, mana, persistence, and actual casting are not yet implemented.
 
 The older ArcanaCircuit graph is a legacy technical prototype and is not the player-facing design vocabulary.
 
 ## 9. Development sequence
 
-1. Replace free-form glyph semantic definitions with references to an Arcana-owned standard symbol registry.
+1. Migrate the legacy free-form graph validator to use registry-defined ports and control-flow contracts.
 2. Validate typed paths, branch semantics, bounded repetition, reusable fragments, and cross-host connections against that registry.
 3. Replace obsolete spell-learning and minimum-caster-rank semantics with control/complexity checks.
 4. Upgrade the language front end from aliases to deterministic phrase/grammar translation that can emit only registered canonical symbols or valid canonical AST templates.
@@ -166,11 +167,11 @@ The first playable experience should let a player author a small working, valida
 Direct use of Arcana's own standard magical writing is a first-class authoring route. A player does not need to create a personal language before writing or casting a working. Player-authored languages are optional front ends that converge on the same canonical representation.
 
 Keep three layers separate:
-- **Semantic symbol definition:** the Arcana-owned operation or structural role, identified by a stable namespaced ID and eventually defined by typed ports, parameter schema, validation contract, and bounded runtime meaning.
+- **Semantic symbol definition:** the Arcana-owned operation or structural role, identified by a stable namespaced ID and defined by registry-owned typed ports, parameter schema, control-flow class, complexity weight, and optional capability mapping.
 - **Canonical written glyph:** the visible character/grapheme that writes a reference to a semantic symbol. Its visual outline does not define its meaning.
 - **Player language:** a player-authored writing/vocabulary/grammar system that deterministically translates into canonical symbols or canonical AST templates.
 
-The current nine registry IDs are provisional semantic building blocks, not the finished alphabet. Their English labels are not the visible magical characters. Broad categories may later contain multiple concrete, narrowly specified symbols. Do not assign permanent Unicode code points to the nine broad IDs before the concrete inventory and visual writing system are designed.
+The former nine registry IDs are now non-instantiable family headings, not writable symbols or alphabet characters. Concrete symbols have their own narrow IDs, typed ports, parameters, and capability mappings. See [Standard Symbol Catalog v0.1](../language/STANDARD_SYMBOL_CATALOG.md). Their English identifiers are not the visible magical characters. Do not assign permanent Unicode code points before the visual writing system is designed.
 
 A glyph's identity must be its canonical Arcana registry key, not its Unicode code point or font outline. A custom font may use Unicode Private Use Area slots as a rendering/transport detail, but those values must never become semantic identities or authority boundaries. The versioned canonical script table resolves written graphemes to registered symbol IDs. A plain-text fallback notation may be used for tests, diagnostics, and accessibility.
 
@@ -180,10 +181,11 @@ The full script specification and implementation sequence are in [Canonical Glyp
 
 ## 11. Registry-backed canonical symbol model (implementation milestone)
 
-The code now has a separate registry-backed canonical model:
-- `CanonicalGlyph` stores an instance id, an Arcana standard-symbol id, and data parameters only. It has no fields for player-defined ports, operation kinds, or semantic behavior.
+The code now has a registry-backed canonical model:
+- `CanonicalGlyph` stores an instance id, an Arcana standard-symbol id, and data parameters only. It cannot declare ports, operations, capabilities, or semantic behavior.
 - `CanonicalWeave` is a list of those references.
-- `StandardSymbolRegistry.builtins()` exposes the immutable built-in symbol identifier set and the parameter keys currently permitted for each symbol.
-- `validateCanonical` rejects unknown symbol ids, unknown parameter keys, duplicate instance ids, and invalid/unbounded repetition settings.
+- `StandardSymbolRegistry.builtins()` exposes immutable concrete definitions, including typed input/output ports, parameter schemas, control-flow classes, complexity weights, and optional capability identifiers.
+- The former nine broad names are retained as non-instantiable category headings.
+- `validateCanonical` rejects unknown and abstract category IDs, unknown or missing parameters, malformed parameter values, out-of-range values, and duplicate instance IDs.
 
-This is an initial ownership boundary, not the finished symbol specification. The current registry still needs authoritative typed port definitions, parameter types/ranges, control-flow contracts, and semantic validators. The older `Glyph`/free-form port graph remains as a legacy structural prototype for existing graph tests; it is not the canonical player-authored symbol model and must not be used as the language compiler's trusted output. Migration of graph validation to registry-defined ports is the next step.
+The concrete inventory is documented in [Standard Symbol Catalog v0.1](../language/STANDARD_SYMBOL_CATALOG.md). The registry is not yet a complete graph validator: it does not yet validate connections between canonical glyph instances, branch/join execution semantics, or capability implementations. The older `Glyph`/free-form port graph remains a legacy structural prototype for existing graph tests; it is not the canonical player-authored symbol model and must not be used as trusted compiler output. Migrating graph validation to registry-defined ports is the next step.
