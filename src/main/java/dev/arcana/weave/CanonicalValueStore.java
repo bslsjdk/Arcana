@@ -166,18 +166,13 @@ public final class CanonicalValueStore {
     /** Clears all values emitted by one glyph and releases their live slots. */
     public Result clearGlyph(String glyphId) {
         if (glyphId == null) return result(Status.INVALID_REQUEST, "Glyph id is required.");
-        int removed = 0;
-        var iterator = values.keySet().iterator();
-        while (iterator.hasNext()) {
-            if (iterator.next().glyphId().equals(glyphId)) {
-                iterator.remove();
-                removed++;
-            }
-        }
+        int removed = (int) values.keySet().stream()
+                .filter(address -> address.glyphId().equals(glyphId)).count();
         if (removed == 0) return new Result(Status.REPLACED, null, null);
         CanonicalExecutionBudget.Admission admission = budget.releaseRuntimeValues(removed);
         if (admission != CanonicalExecutionBudget.Admission.ACCEPTED)
-            throw new IllegalStateException("Value store and execution budget accounting diverged.");
+            return result(Status.INVALID_REQUEST, "Value-store and budget accounting are inconsistent.");
+        values.keySet().removeIf(address -> address.glyphId().equals(glyphId));
         return new Result(Status.REPLACED, null, null);
     }
 
