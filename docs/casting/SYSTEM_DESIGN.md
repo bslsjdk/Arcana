@@ -326,3 +326,9 @@ This is a loader-independent lifecycle controller, not yet a Minecraft Screen or
 The profile intentionally excludes learned knowledge, spell unlocks, and capability permissions. A converter definition only describes how source language maps to canonical Arcana syntax. It does not prove comprehension, grant a spell, authorize a capability, or increase casting control. Knowledge/research progression must be represented by a separate model and separate persistence rules. The converter is world-scoped and is not automatically copied into another world.
 
 This persistence layer is implemented, but there is not yet a player-facing language editor, trigger-settings screen, packet protocol, or command workflow. Client-submitted edits must be validated and committed by the logical server; clients must never write SavedData directly.
+
+## 23. Server-side player profile access
+
+`PlayerArcanaProfileService` is the logical-server access point for profile-backed casting input. It resolves the player's UUID against the current world's Overworld SavedData, can create a stateful `CastingSessionController` using that player's trigger profile for voice-command mode, and can prepare casting-window source directly with that player's language definition. The window preparation method never invokes the trigger recognizer.
+
+A missing player profile fails closed: voice input returns INVALID_INPUT and window preparation returns INVALID_REQUEST. Profile creation/editing still requires a future validated settings workflow; the service does not create implicit default language knowledge or trigger settings. All profile writes must occur on the logical server thread.
