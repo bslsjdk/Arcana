@@ -94,6 +94,21 @@ class PlayerArcanaProfileCodecTest {
     }
 
     @Test
+    void restoredProfileCanDriveTheSharedLanguageAndVoiceInputPipelines() {
+        var restored = PlayerArcanaProfileCodec.decode(
+                PlayerArcanaProfileCodec.encode(profile()));
+
+        var preparation = dev.arcana.language.CastingPreparationPipeline.prepare(
+                "grim \\"spark\\" { sigil \\"arcana:effect/light\\"(power = 2); }",
+                restored.language());
+        assertTrue(preparation.successful(), () -> preparation.diagnostics().toString());
+
+        var trigger = CastingTriggerRecognizer.recognize(
+                "grim \\"spark\\" {} Astra", restored.triggers());
+        assertEquals(CastingTriggerRecognizer.Status.ACTIVATED, trigger.status());
+    }
+
+    @Test
     void profileDoesNotContainOrInferLearnedKnowledge() {
         var saved = profile();
         assertNotNull(saved.language());
