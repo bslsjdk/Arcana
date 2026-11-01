@@ -11,7 +11,7 @@ Arcana must not collapse these into one level:
 - **Spell rank:** the complexity and power of the spell itself.
 - **Medium capacity:** the maximum spell rank a particular tool can safely channel or anchor.
 
-A high-rank caster may cast lower-rank spells. A low-rank caster cannot bypass their own rank limit by holding a powerful focus crystal. A high-rank caster also cannot force a weak focus crystal to channel a spell beyond that wand's capacity.
+A high-rank caster may cast lower-rank spells. A low-rank caster cannot bypass their own rank limit by holding a powerful focus crystal. A high-rank caster also cannot force a weak focus crystal to channel a spell beyond that focus crystal's capacity.
 
 The spell may additionally declare a minimum caster rank. This represents knowledge, control, or a special prerequisite that cannot be bypassed merely by having a powerful medium.
 
@@ -21,7 +21,7 @@ The spell may additionally declare a minimum caster rank. This represents knowle
 |---:|---|---|
 | 0 | Novice | Basic magical awareness and simple cantrips |
 | 1 | Apprentice | Elementary spells and basic tools |
-| 2 | Adept | Reliable combat, utility, and crafting magic |
+| 2 | Adept | Reliable exploration, utility, and crafting magic |
 | 3 | Expert | Complex effects and multi-step spells |
 | 4 | Master | Advanced spell structures and large-area effects |
 | 5 | Archmage | High-order magic, advanced rituals, space manipulation research |
@@ -49,7 +49,7 @@ These names and boundaries are data-driven design defaults, not final balance va
 - Imported or player-authored scroll data must be revalidated by the server.
 
 ### Magic circle
-- A ritual anchor, not simply a larger wand.
+- A ritual anchor, not simply a larger focus crystal.
 - Defines geometry, participants, anchors, materials, and staged conditions.
 - Supports effects that are too long-running, spatially extensive, or resource-intensive for ordinary direct casting.
 - May distribute eligible costs and roles across participants, but must not silently bypass each participant's permissions or ritual requirements.
@@ -100,7 +100,7 @@ The default direct-casting rank rule is:
 
 The spell's minimum caster rank must also be met, and the medium must support the spell's rank and casting mode.
 
-This naturally permits a Master to cast Apprentice spells without requiring a separate exception for every lower tier. It does not permit an Apprentice to cast a Master spell merely by borrowing a Sovereign's staff.
+This naturally permits a Master to cast Apprentice spells without requiring a separate exception for every lower tier. It does not permit an Apprentice to cast a Master spell merely by borrowing a Sovereign's focus crystal.
 
 Special spells may impose additional requirements, such as a particular school, learned prerequisite, ritual role, or world condition. Such requirements must be explicit spell metadata, not hidden exceptions in item code.
 
@@ -121,10 +121,10 @@ It does **not** register Minecraft items, add inventory or GUI interactions, con
 Implement the first playable loop in this order:
 1. Register a basic grimoire item that opens a spellbook screen.
 2. Add a simple spell collection data model and a few built-in test spells.
-3. Register a basic wand as the first direct-casting medium.
+3. Register a basic focus crystal as the first direct-casting medium.
 4. Add a server-authoritative cast request and validation using ArcanaCastingRules.
 5. Add a harmless test spell with a visible effect.
 6. Add a magic-circle block/entity as a ritual anchor only after direct casting works.
 7. Add rank progression and spell learning after the first casting loop is reliable.
 
-The first playable slice should prove that a player can open a book, select a learned spell, use a wand, receive clear rejection reasons when requirements fail, and successfully cast one harmless spell.
+The first playable slice should prove that a player can open a book, select a learned spell, use a focus crystal, receive clear rejection reasons when requirements fail, and successfully cast one harmless spell.
