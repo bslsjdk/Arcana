@@ -243,4 +243,20 @@ class CanonicalSymbolRegistryTest {
                 .anyMatch(issue -> issue.code().equals("CANONICAL_REGION_OVERLAP")));
     }
 
+
+    @Test
+    void controlOwnerPortCannotFanOutToMultipleRegionEntries() {
+        var registry = ArcaneWeave.StandardSymbolRegistry.builtins();
+        var valid = repeatWeave("arcana:repeat_fanout", "3");
+        var glyphs = new java.util.ArrayList<>(valid.glyphs());
+        glyphs.add(new ArcaneWeave.CanonicalGlyph("otherBody", "arcana:control/entry", Map.of()));
+        var connections = new java.util.ArrayList<>(valid.connections());
+        connections.add(new ArcaneWeave.CanonicalConnection("repeat", "body", "otherBody", "flow"));
+        var invalid = new ArcaneWeave.CanonicalWeave(
+                valid.id(), valid.version(), glyphs, connections, valid.regions());
+
+        assertTrue(ArcaneWeave.validateCanonical(invalid, registry).diagnostics().stream()
+                .anyMatch(issue -> issue.code().equals("CANONICAL_REGION_OWNER_PORT_FANOUT")));
+    }
+
 }
