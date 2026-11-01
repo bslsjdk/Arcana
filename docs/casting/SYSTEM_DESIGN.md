@@ -190,3 +190,18 @@ The code now has a registry-backed canonical model:
 - `canonicalComplexity` sums registry-owned structural weights and is independent of source-language length.
 
 The concrete inventory is documented in [Standard Symbol Catalog v0.1](../language/STANDARD_SYMBOL_CATALOG.md). The registry-backed validator now checks typed connections and required input bindings. It does not yet fully define branch/join execution semantics, nested sub-weave installation, or capability implementations. The older `Glyph`/free-form port graph remains a legacy structural prototype for existing graph tests; it is not the canonical player-authored symbol model and must not be used as trusted compiler output. Migrating graph validation to registry-defined ports is the next step.
+
+
+## 12. Control-flow compilation and per-cast budget foundation
+
+A validated canonical weave can now be compiled into an immutable `CanonicalControlFlowPlan.Plan`. The plan records deterministic root entries, nested region ownership, branch condition sources and selected-arm join semantics, bounded repeat declarations, completion continuations, and sorted typed connections. This is a data-only compilation artifact; it does not evaluate data nodes, schedule execution, access the world, or spend mana.
+
+`CanonicalExecutionBudget.Session` is the mutable accounting state for one future cast. It independently limits:
+- total node steps;
+- nested control-region depth;
+- iterations for each individual loop activation;
+- currently reserved runtime-value slots.
+
+Loop iteration counters are keyed by both the canonical loop instance and a runtime activation ID. This matters when a loop is entered again from an outer loop: a completed activation can be explicitly released without confusing it with the next activation. Runtime value reservations can likewise be released, and rejected reservations do not partially mutate state.
+
+Each cast must own its own budget session. Sessions must never be stored on the immutable weave, compiled plan, player-independent symbol registry, or shared host definition. The budget class is accounting only; the interpreter must consume it before scheduling work or allocating runtime values. Capability authorization, mana accounting, and world mutation remain separate server-authoritative checks.
