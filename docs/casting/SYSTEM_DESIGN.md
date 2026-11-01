@@ -160,3 +160,13 @@ The older ArcanaCircuit graph is a legacy technical prototype and is not the pla
 8. Prove one harmless end-to-end working before expanding into complex rituals, structures, and world-scale magic.
 
 The first playable experience should let a player author a small working, validate it, install it on a suitable host, activate it through a permitted interface, and receive clear diagnostics when any part is invalid.
+
+## 10. Registry-backed canonical symbol model (implementation milestone)
+
+The code now has a separate registry-backed canonical model:
+- `CanonicalGlyph` stores an instance id, an Arcana standard-symbol id, and data parameters only. It has no fields for player-defined ports, operation kinds, or semantic behavior.
+- `CanonicalWeave` is a list of those references.
+- `StandardSymbolRegistry.builtins()` exposes the immutable built-in symbol identifier set and the parameter keys currently permitted for each symbol.
+- `validateCanonical` rejects unknown symbol ids, unknown parameter keys, duplicate instance ids, and invalid/unbounded repetition settings.
+
+This is an initial ownership boundary, not the finished symbol specification. The current registry still needs authoritative typed port definitions, parameter types/ranges, control-flow contracts, and semantic validators. The older `Glyph`/free-form port graph remains as a legacy structural prototype for existing graph tests; it is not the canonical player-authored symbol model and must not be used as the language compiler's trusted output. Migration of graph validation to registry-defined ports is the next step.
