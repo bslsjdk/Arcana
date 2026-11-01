@@ -30,7 +30,7 @@ The first implementation branch establishes:
 
 - a NeoForge 1.21.1 / Java 21 project;
 - a bounded canonical-language lexer and recursive-descent parser;
-- a versioned player-language keyword-alias translator;
+- a versioned player-language translator with keyword aliases and deterministic phrase expansion;
 - a canonical AST with source spans and structured diagnostics;
 - static semantic validation for primitive types, sequential variable declarations, duplicate declarations, undefined references, and capability identifier format;
 - unit tests for parsing, translation equivalence, semantic validation, and malformed input;
@@ -38,7 +38,7 @@ The first implementation branch establishes:
 - registered grimoire, focus crystal, and scroll items;
 - an initial typed graph prototype, currently an internal foundation rather than a finished magical-weave editor.
 
-The v0.1 translator currently maps vocabulary aliases for canonical keywords. It does **not yet** support arbitrary grammar productions, word-order changes, inflection, phrase-level mappings, or syntax templates. The semantic validator is static analysis only: it does not execute capabilities or mutate the Minecraft world.
+The v0.2 translator supports vocabulary aliases and deterministic token-phrase rules. Phrase rules can expand a short expression into a larger canonical source fragment or compress a longer phrase into a short canonical token. It does **not yet** support arbitrary grammar productions, word-order transformations, inflection, syntax-tree patterns, or context-sensitive disambiguation. The semantic validator is static analysis only: it does not execute capabilities or mutate the Minecraft world.
 
 The grimoire, focus crystal, and scroll are registered as inert items in an Arcana creative tab, with placeholder vanilla models. Spellbook UI, persistent host installations, mana handling, and actual spell execution are **not implemented yet**.
 
