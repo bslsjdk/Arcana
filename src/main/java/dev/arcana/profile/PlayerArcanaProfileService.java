@@ -35,6 +35,13 @@ public final class PlayerArcanaProfileService {
                 .removeProfile(player.getUUID());
     }
 
+    /** Creates the stateful trigger session for ordinary voice-command input. */
+    public static Optional<dev.arcana.casting.CastingSessionController> newVoiceCommandSession(
+            ServerPlayer player) {
+        return get(player).map(profile ->
+                new dev.arcana.casting.CastingSessionController(profile.triggers()));
+    }
+
     /** Recognizes trigger markers only for the ordinary voice-command path. */
     public static CastingTriggerRecognizer.Result recognizeVoiceCommand(
             ServerPlayer player, String recognizedTranscript) {
