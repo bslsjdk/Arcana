@@ -14,14 +14,25 @@ import java.util.Objects;
  * name lookup, coercion, or fallback guessing.
  */
 public final class CanonicalValueStore {
+    private final ArcaneWeave.CanonicalWeave weave;
     private final ArcaneWeave.StandardSymbolRegistry registry;
     private final CanonicalExecutionBudget.Session budget;
+    private final Map<String, ArcaneWeave.CanonicalGlyph> glyphsById;
     private final Map<PortAddress, RuntimeValue> values = new HashMap<>();
 
-    public CanonicalValueStore(ArcaneWeave.StandardSymbolRegistry registry,
+    public CanonicalValueStore(ArcaneWeave.CanonicalWeave weave,
+                               ArcaneWeave.StandardSymbolRegistry registry,
                                CanonicalExecutionBudget.Session budget) {
+        this.weave = Objects.requireNonNull(weave, "weave");
         this.registry = Objects.requireNonNull(registry, "registry");
         this.budget = Objects.requireNonNull(budget, "budget");
+        ArcaneWeave.SymbolValidation validation = ArcaneWeave.validateCanonical(weave, registry);
+        if (!validation.valid())
+            throw new IllegalArgumentException("Cannot create a value store for an invalid canonical weave: "
+                    + validation.diagnostics());
+        Map<String, ArcaneWeave.CanonicalGlyph> index = new HashMap<>();
+        weave.glyphs().forEach(glyph -> index.put(glyph.instanceId(), glyph));
+        this.glyphsById = Map.copyOf(index);
     }
 
     public sealed interface RuntimeValue permits NumberValue, BooleanValue, TextValue, Vector3Value {
@@ -93,10 +104,11 @@ public final class CanonicalValueStore {
         }
     }
 
-    public Result writeOutput(ArcaneWeave.CanonicalGlyph glyph, String outputPort,
-                              RuntimeValue value) {
-        if (glyph == null || outputPort == null || value == null)
-            return result(Status.INVALID_REQUEST, "Glyph, output port, and value are required.");
+    public Result writeOutput(String glyphId, String outputPort, RuntimeValue value) {
+        if (glyphId == null || outputPort == null || value == null)
+            return result(Status.INVALID_REQUEST, "Glyph id, output port, and value are required.");
+        ArcaneWeave.CanonicalGlyph glyph = glyphsById.get(glyphId);
+        if (glyph == null) return result(Status.UNKNOWN_GLYPH, "Glyph is not part of this canonical weave.");
         ArcaneWeave.StandardSymbolDefinition definition = registry.definition(glyph.symbolId());
         if (definition == null) return result(Status.UNKNOWN_SYMBOL, "Symbol is not registered.");
         if (!definition.instantiable()) return result(Status.UNKNOWN_SYMBOL, "Abstract categories cannot produce values.");
@@ -116,10 +128,10 @@ public final class CanonicalValueStore {
         return new Result(replacing ? Status.REPLACED : Status.STORED, value, null);
     }
 
-    public Result readInput(ArcaneWeave.CanonicalWeave weave, String targetGlyphId, String inputPort) {
-        if (weave == null || targetGlyphId == null || inputPort == null)
-            return result(Status.INVALID_REQUEST, "Weave, target glyph, and input port are required.");
-        ArcaneWeave.CanonicalGlyph target = findGlyph(weave.glyphs(), targetGlyphId);
+    public Result readInput(String targetGlyphId, String inputPort) {
+        if (targetGlyphId == null || inputPort == null)
+            return result(Status.INVALID_REQUEST, "Target glyph and input port are required.");
+        ArcaneWeave.CanonicalGlyph target = glyphsById.get(targetGlyphId);
         if (target == null) return result(Status.UNKNOWN_GLYPH, "Target glyph does not exist.");
         ArcaneWeave.StandardSymbolDefinition targetDefinition = registry.definition(target.symbolId());
         if (targetDefinition == null || !targetDefinition.instantiable())
@@ -134,7 +146,7 @@ public final class CanonicalValueStore {
         if (incoming.size() != 1) return result(Status.INVALID_REQUEST, "Input has multiple incoming connections.");
 
         ArcaneWeave.CanonicalConnection edge = incoming.getFirst();
-        ArcaneWeave.CanonicalGlyph source = findGlyph(weave.glyphs(), edge.fromGlyph());
+        ArcaneWeave.CanonicalGlyph source = glyphsById.get(edge.fromGlyph());
         if (source == null) return result(Status.UNKNOWN_GLYPH, "Source glyph does not exist.");
         ArcaneWeave.StandardSymbolDefinition sourceDefinition = registry.definition(source.symbolId());
         if (sourceDefinition == null || !sourceDefinition.instantiable())
@@ -170,11 +182,6 @@ public final class CanonicalValueStore {
     }
 
     public Map<PortAddress, RuntimeValue> snapshot() { return Map.copyOf(values); }
-
-    private static ArcaneWeave.CanonicalGlyph findGlyph(
-            List<ArcaneWeave.CanonicalGlyph> glyphs, String id) {
-        return glyphs.stream().filter(glyph -> glyph.instanceId().equals(id)).findFirst().orElse(null);
-    }
 
     private static Result result(Status status, String diagnostic) {
         return new Result(status, null, diagnostic);
