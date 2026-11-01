@@ -183,9 +183,10 @@ The full script specification and implementation sequence are in [Canonical Glyp
 
 The code now has a registry-backed canonical model:
 - `CanonicalGlyph` stores an instance id, an Arcana standard-symbol id, and data parameters only. It cannot declare ports, operations, capabilities, or semantic behavior.
-- `CanonicalWeave` is a list of those references.
+- `CanonicalWeave` stores canonical glyph references plus explicit typed connections.
 - `StandardSymbolRegistry.builtins()` exposes immutable concrete definitions, including typed input/output ports, parameter schemas, control-flow classes, complexity weights, and optional capability identifiers.
 - The former nine broad names are retained as non-instantiable category headings.
-- `validateCanonical` rejects unknown and abstract category IDs, unknown or missing parameters, malformed parameter values, out-of-range values, and duplicate instance IDs.
+- `validateCanonical` rejects unknown and abstract category IDs, invalid parameters, unknown ports, type mismatches, duplicate input bindings, unbound required inputs, duplicate instances, and raw cycles.
+- `canonicalComplexity` sums registry-owned structural weights and is independent of source-language length.
 
-The concrete inventory is documented in [Standard Symbol Catalog v0.1](../language/STANDARD_SYMBOL_CATALOG.md). The registry is not yet a complete graph validator: it does not yet validate connections between canonical glyph instances, branch/join execution semantics, or capability implementations. The older `Glyph`/free-form port graph remains a legacy structural prototype for existing graph tests; it is not the canonical player-authored symbol model and must not be used as trusted compiler output. Migrating graph validation to registry-defined ports is the next step.
+The concrete inventory is documented in [Standard Symbol Catalog v0.1](../language/STANDARD_SYMBOL_CATALOG.md). The registry-backed validator now checks typed connections and required input bindings. It does not yet fully define branch/join execution semantics, nested sub-weave installation, or capability implementations. The older `Glyph`/free-form port graph remains a legacy structural prototype for existing graph tests; it is not the canonical player-authored symbol model and must not be used as trusted compiler output. Migrating graph validation to registry-defined ports is the next step.
