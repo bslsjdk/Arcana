@@ -18,13 +18,13 @@ class ArcanaCastingRulesTest {
     void higherRankCasterCanCastLowerRankSpell() {
         var caster = new ArcanaCastingRules.CasterProfile(ArcanaCastingRules.Rank.MASTER);
         var spell = spell(ArcanaCastingRules.Rank.APPRENTICE,
-                ArcanaCastingRules.Rank.APPRENTICE, ArcanaCastingRules.MediumKind.STAFF);
-        var staff = new ArcanaCastingRules.MediumProfile(
-                ArcanaCastingRules.MediumKind.STAFF,
+                ArcanaCastingRules.Rank.APPRENTICE, ArcanaCastingRules.MediumKind.FOCUS_CRYSTAL);
+        var focusCrystal = new ArcanaCastingRules.MediumProfile(
+                ArcanaCastingRules.MediumKind.FOCUS_CRYSTAL,
                 ArcanaCastingRules.Rank.ARCHMAGE, true, true);
 
         var result = ArcanaCastingRules.evaluate(
-                caster, spell, staff, ArcanaCastingRules.CastingMode.DIRECT);
+                caster, spell, focusCrystal, ArcanaCastingRules.CastingMode.DIRECT);
 
         assertTrue(result.allowed(), () -> result.issues().toString());
     }
@@ -33,13 +33,13 @@ class ArcanaCastingRulesTest {
     void lowRankCasterCannotCastHigherRankSpell() {
         var caster = new ArcanaCastingRules.CasterProfile(ArcanaCastingRules.Rank.APPRENTICE);
         var spell = spell(ArcanaCastingRules.Rank.MASTER,
-                ArcanaCastingRules.Rank.EXPERT, ArcanaCastingRules.MediumKind.STAFF);
-        var staff = new ArcanaCastingRules.MediumProfile(
-                ArcanaCastingRules.MediumKind.STAFF,
+                ArcanaCastingRules.Rank.EXPERT, ArcanaCastingRules.MediumKind.FOCUS_CRYSTAL);
+        var focusCrystal = new ArcanaCastingRules.MediumProfile(
+                ArcanaCastingRules.MediumKind.FOCUS_CRYSTAL,
                 ArcanaCastingRules.Rank.SOVEREIGN, true, true);
 
         var result = ArcanaCastingRules.evaluate(
-                caster, spell, staff, ArcanaCastingRules.CastingMode.DIRECT);
+                caster, spell, focusCrystal, ArcanaCastingRules.CastingMode.DIRECT);
 
         assertFalse(result.allowed());
         assertTrue(result.issues().stream().anyMatch(i -> i.code().equals("SPELL_RANK_TOO_HIGH")));
@@ -50,13 +50,13 @@ class ArcanaCastingRulesTest {
     void mediumCapacityIsIndependentFromCasterRank() {
         var caster = new ArcanaCastingRules.CasterProfile(ArcanaCastingRules.Rank.ARCHMAGE);
         var spell = spell(ArcanaCastingRules.Rank.MASTER,
-                ArcanaCastingRules.Rank.MASTER, ArcanaCastingRules.MediumKind.WAND);
-        var wand = new ArcanaCastingRules.MediumProfile(
-                ArcanaCastingRules.MediumKind.WAND,
+                ArcanaCastingRules.Rank.MASTER, ArcanaCastingRules.MediumKind.FOCUS_CRYSTAL);
+        var focusCrystal = new ArcanaCastingRules.MediumProfile(
+                ArcanaCastingRules.MediumKind.FOCUS_CRYSTAL,
                 ArcanaCastingRules.Rank.ADEPT, true, false);
 
         var result = ArcanaCastingRules.evaluate(
-                caster, spell, wand, ArcanaCastingRules.CastingMode.DIRECT);
+                caster, spell, focusCrystal, ArcanaCastingRules.CastingMode.DIRECT);
 
         assertFalse(result.allowed());
         assertTrue(result.issues().stream().anyMatch(i -> i.code().equals("MEDIUM_RANK_LIMIT")));
@@ -83,12 +83,12 @@ class ArcanaCastingRulesTest {
         var caster = new ArcanaCastingRules.CasterProfile(ArcanaCastingRules.Rank.MASTER);
         var spell = spell(ArcanaCastingRules.Rank.ADEPT,
                 ArcanaCastingRules.Rank.ADEPT, ArcanaCastingRules.MediumKind.MAGIC_CIRCLE);
-        var staff = new ArcanaCastingRules.MediumProfile(
-                ArcanaCastingRules.MediumKind.STAFF,
+        var focusCrystal = new ArcanaCastingRules.MediumProfile(
+                ArcanaCastingRules.MediumKind.FOCUS_CRYSTAL,
                 ArcanaCastingRules.Rank.SOVEREIGN, true, true);
 
         var result = ArcanaCastingRules.evaluate(
-                caster, spell, staff, ArcanaCastingRules.CastingMode.RITUAL);
+                caster, spell, focusCrystal, ArcanaCastingRules.CastingMode.RITUAL);
 
         assertFalse(result.allowed());
         assertTrue(result.issues().stream().anyMatch(i -> i.code().equals("INCOMPATIBLE_MEDIUM")));
