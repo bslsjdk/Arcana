@@ -7,6 +7,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
 import com.google.gson.JsonParser;
 
+import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -20,7 +21,8 @@ import java.util.UUID;
 public final class PlayerArcanaProfileStore {
     public static final int STORE_SCHEMA_VERSION = 1;
     public static final int MAX_PROFILES = 4_096;
-    public static final int MAX_STORE_JSON_LENGTH = 4_194_304;
+    public static final int MAX_STORE_JSON_LENGTH = 1_048_576;
+    public static final int MAX_STORE_JSON_BYTES = 1_048_576;
 
     private static final Gson GSON = new GsonBuilder().disableHtmlEscaping().create();
     private final Map<UUID, PlayerArcanaProfile> profiles = new LinkedHashMap<>();
@@ -61,7 +63,8 @@ public final class PlayerArcanaProfileStore {
         root.add("profiles", entries);
 
         String json = GSON.toJson(root);
-        if (json.length() > MAX_STORE_JSON_LENGTH) {
+        if (json.length() > MAX_STORE_JSON_LENGTH
+                || json.getBytes(StandardCharsets.UTF_8).length > MAX_STORE_JSON_BYTES) {
             throw new IllegalStateException("World player profile data exceeds the storage size limit.");
         }
         return json;
@@ -71,7 +74,8 @@ public final class PlayerArcanaProfileStore {
         if (json == null || json.isBlank()) {
             throw new IllegalArgumentException("World profile data cannot be null or blank.");
         }
-        if (json.length() > MAX_STORE_JSON_LENGTH) {
+        if (json.length() > MAX_STORE_JSON_LENGTH
+                || json.getBytes(StandardCharsets.UTF_8).length > MAX_STORE_JSON_BYTES) {
             throw new IllegalArgumentException("World profile data exceeds the storage size limit.");
         }
 
