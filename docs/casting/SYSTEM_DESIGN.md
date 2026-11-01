@@ -11,7 +11,7 @@ Arcana must not collapse these into one level:
 - **Spell rank:** the complexity and power of the spell itself.
 - **Medium capacity:** the maximum spell rank a particular tool can safely channel or anchor.
 
-A high-rank caster may cast lower-rank spells. A low-rank caster cannot bypass their own rank limit by holding a powerful staff. A high-rank caster also cannot force a weak wand to channel a spell beyond that wand's capacity.
+A high-rank caster may cast lower-rank spells. A low-rank caster cannot bypass their own rank limit by holding a powerful focus crystal. A high-rank caster also cannot force a weak focus crystal to channel a spell beyond that wand's capacity.
 
 The spell may additionally declare a minimum caster rank. This represents knowledge, control, or a special prerequisite that cannot be bypassed merely by having a powerful medium.
 
@@ -34,19 +34,13 @@ These names and boundaries are data-driven design defaults, not final balance va
 ### Grimoire / spellbook
 - Stores learned spells, notes, diagrams, language definitions, and spell source.
 - Provides the primary interface for browsing, studying, editing, compiling, and organizing spells.
-- A normal grimoire is not automatically a casting wand. It does not directly cast a spell unless a special book explicitly has a casting capability.
+- A normal grimoire is not automatically a casting focus. It does not directly cast a spell unless a special book explicitly has a casting capability.
 - Advanced books may contain multiple volumes, modules, annotations, and ritual instructions.
 
-### Wand
-- A precision tool for direct casting.
-- Intended for beginner and intermediate spells.
-- Can provide targeting, stability, and a limited channel capacity.
-- Different wand materials and cores may alter compatible spell families.
-
-### Staff
-- A stronger channel and stabilizer.
-- Can support higher spell ranks, larger effects, and some ritual functions.
-- Its capacity does not grant the holder the knowledge or caster rank needed for a spell.
+### Focus crystal
+- A non-weapon magical focus for stabilizing and directing a spell.
+- Its quality may improve precision or support a limited spell rank.
+- It does not grant the holder knowledge or caster rank.
 
 ### Scroll
 - A prepared, usually consumable spell carrier.
