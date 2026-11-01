@@ -136,3 +136,26 @@ The code now contains `CanonicalScript`, a versioned identity table for the 18 c
 These PUA values are **not the final visual alphabet**. Without the Arcana font, they may render as empty boxes or fallback symbols. They are stable identity/transport slots for this script-table version, not semantic IDs. A future font can draw original forms for these slots without changing their meanings.
 
 The current codec only decodes a flat sequence of symbol references. It does not yet encode parameters, instance identifiers, typed connections, nesting, or complete canonical weaves. A sequence of glyphs is therefore not automatically a valid executable construction; the graph model and validator remain authoritative until the structured script grammar is implemented.
+
+
+## 10. Structured direct-writing codec v1
+
+A first structured codec now exists in `CanonicalScript`. It converts direct standard glyph writing into the existing `CanonicalWeave` model and runs the exact same `validateCanonical` registry validator before returning a parsed weave.
+
+The current textual structure uses the actual canonical character followed by an explicit instance identifier:
+
+```text
+<entry-glyph>#entry;
+<position-glyph>#position{x=1,y=64,z=-2.5};
+<number-glyph>#level{value=12};
+<light-glyph>#light;
+@entry.flow>light.flow;
+@position.position>light.position;
+@level.number>light.level;
+```
+
+Here, each `<...-glyph>` placeholder means the actual one-character private-use glyph, not the placeholder text. The connection declaration starts with `@` and explicitly names source instance/port and target instance/port. Whitespace is permitted around declarations. Glyph declarations and connections are separated by semicolons.
+
+Current v1 scalar parameters are deliberately limited to finite-looking decimal/integer syntax and boolean literals; the registry remains the authority for the actual parameter type and range. String literals and arbitrary expressions are not supported. Duplicate instance IDs, duplicate parameters, unknown characters, malformed connections, and any registry validation error fail closed.
+
+The codec supports deterministic `encodeWeave` and `parseWeave` round trips for the current flat canonical graph model. It does **not** yet add nested sub-weaves, explicit branch-region bodies, or bounded-loop body ownership. The existing repeat symbol is still only a registered symbol with a bounded `maxIterations` parameter; the runtime meaning of its body remains future work. Do not treat this codec as a complete executable magic language yet.
