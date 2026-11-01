@@ -87,6 +87,8 @@ public final class CanonicalNodeEvaluator {
 
     public CanonicalValueStore valueStore() { return values; }
 
+    public CanonicalExecutionBudget.Snapshot budgetSnapshot() { return budget.snapshot(); }
+
     private Evaluation evaluateNumber(ArcaneWeave.CanonicalGlyph glyph) {
         BigDecimal value = new BigDecimal(glyph.parameters().get("value"));
         return publish(glyph.instanceId(), "number", new CanonicalValueStore.NumberValue(value));
