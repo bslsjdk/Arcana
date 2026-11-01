@@ -42,7 +42,7 @@ public final class CanonicalValueStore {
     public record NumberValue(BigDecimal value) implements RuntimeValue {
         public NumberValue {
             Objects.requireNonNull(value, "value");
-            if (value.precision() > 128 || Math.abs(value.scale()) > 64)
+            if (value.precision() > 128 || value.scale() > 64 || value.scale() < -64)
                 throw new IllegalArgumentException("Number exceeds runtime precision limits.");
         }
         public NumberValue(String value) { this(new BigDecimal(value)); }
