@@ -92,11 +92,28 @@ public final class CanonicalExecutionBudget {
             return value != null && value.matches("[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}");
         }
 
-        /** Reserves runtime value slots without partially changing state on failure. */
+        /** Marks a loop activation complete and releases its per-activation counter. */
+        public Admission finishLoop(String loopId, String activationId) {
+            if (!isIdentifier(loopId) || !isIdentifier(activationId))
+                return Admission.INVALID_REQUEST;
+            String activationKey = loopId + "#" + activationId;
+            if (loopIterations.remove(activationKey) == null) return Admission.INVALID_STATE;
+            return Admission.ACCEPTED;
+        }
+
+        /** Reserves live runtime value slots without partially changing state on failure. */
         public Admission reserveRuntimeValues(int count) {
             if (count < 0) return Admission.INVALID_REQUEST;
             if (count > limits.maximumRuntimeValues() - runtimeValues) return Admission.LIMIT_REACHED;
             runtimeValues += count;
+            return Admission.ACCEPTED;
+        }
+
+        /** Releases live runtime value slots; underflow is rejected without mutation. */
+        public Admission releaseRuntimeValues(int count) {
+            if (count < 0) return Admission.INVALID_REQUEST;
+            if (count > runtimeValues) return Admission.INVALID_STATE;
+            runtimeValues -= count;
             return Admission.ACCEPTED;
         }
 
