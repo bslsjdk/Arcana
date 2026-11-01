@@ -27,8 +27,11 @@ class CanonicalSymbolRegistryTest {
         return new ArcaneWeave.CanonicalWeave(id, 1, List.of(
                 new ArcaneWeave.CanonicalGlyph("start", "arcana:control/entry", Map.of()),
                 new ArcaneWeave.CanonicalGlyph("repeat", "arcana:control/repeat",
-                        Map.of("maxIterations", maxIterations))
-        ), List.of(new ArcaneWeave.CanonicalConnection("start", "flow", "repeat", "flow")));
+                        Map.of("maxIterations", maxIterations)),
+                new ArcaneWeave.CanonicalGlyph("bodyNode", "arcana:control/entry", Map.of())
+        ), List.of(new ArcaneWeave.CanonicalConnection("start", "flow", "repeat", "flow")),
+                List.of(new ArcaneWeave.CanonicalRegion("body", "repeat", "body",
+                        "bodyNode", "bodyNode", List.of("bodyNode"), null)));
     }
 
     @Test
@@ -158,4 +161,61 @@ class CanonicalSymbolRegistryTest {
                 weave, ArcaneWeave.StandardSymbolRegistry.builtins()).diagnostics().stream()
                 .anyMatch(issue -> issue.code().equals("CANONICAL_DUPLICATE_INSTANCE")));
     }
+
+    @Test
+    void branchRequiresDistinctTrueAndFalseRegions() {
+        var registry = ArcaneWeave.StandardSymbolRegistry.builtins();
+        var branch = new ArcaneWeave.CanonicalWeave("arcana:branch_regions", 1, List.of(
+                new ArcaneWeave.CanonicalGlyph("start", "arcana:control/entry", Map.of()),
+                new ArcaneWeave.CanonicalGlyph("left", "arcana:reference/number", Map.of("value", "1")),
+                new ArcaneWeave.CanonicalGlyph("right", "arcana:reference/number", Map.of("value", "2")),
+                new ArcaneWeave.CanonicalGlyph("condition", "arcana:data/equal", Map.of()),
+                new ArcaneWeave.CanonicalGlyph("branch", "arcana:control/branch", Map.of()),
+                new ArcaneWeave.CanonicalGlyph("trueStart", "arcana:control/entry", Map.of()),
+                new ArcaneWeave.CanonicalGlyph("falseStart", "arcana:control/entry", Map.of())
+        ), List.of(
+                new ArcaneWeave.CanonicalConnection("start", "flow", "branch", "flow"),
+                new ArcaneWeave.CanonicalConnection("left", "number", "condition", "left"),
+                new ArcaneWeave.CanonicalConnection("right", "number", "condition", "right"),
+                new ArcaneWeave.CanonicalConnection("condition", "result", "branch", "condition")
+        ), List.of(
+                new ArcaneWeave.CanonicalRegion("trueArm", "branch", "whenTrue",
+                        "trueStart", "trueStart", List.of("trueStart"), null),
+                new ArcaneWeave.CanonicalRegion("falseArm", "branch", "whenFalse",
+                        "falseStart", "falseStart", List.of("falseStart"), null)
+        ));
+
+        assertTrue(ArcaneWeave.validateCanonical(branch, registry).valid());
+        var missingArm = new ArcaneWeave.CanonicalWeave(branch.id(), branch.version(),
+                branch.glyphs(), branch.connections(), List.of(branch.regions().getFirst()));
+        assertTrue(ArcaneWeave.validateCanonical(missingArm, registry).diagnostics().stream()
+                .anyMatch(issue -> issue.code().equals("CANONICAL_BRANCH_REGION_MISSING")));
+    }
+
+    @Test
+    void nestedRegionsMustStayInsideTheirParentAndCannotOverlapAsSiblings() {
+        var registry = ArcaneWeave.StandardSymbolRegistry.builtins();
+        var invalid = new ArcaneWeave.CanonicalWeave("arcana:nested_regions", 1, List.of(
+                new ArcaneWeave.CanonicalGlyph("branch", "arcana:control/branch", Map.of()),
+                new ArcaneWeave.CanonicalGlyph("repeat", "arcana:control/repeat", Map.of("maxIterations", "3")),
+                new ArcaneWeave.CanonicalGlyph("inside", "arcana:control/entry", Map.of()),
+                new ArcaneWeave.CanonicalGlyph("outside", "arcana:control/entry", Map.of())
+        ), List.of(), List.of(
+                new ArcaneWeave.CanonicalRegion("parent", "branch", "whenTrue",
+                        "repeat", "repeat", List.of("repeat", "inside"), null),
+                new ArcaneWeave.CanonicalRegion("otherArm", "branch", "whenFalse",
+                        "outside", "outside", List.of("outside"), null),
+                new ArcaneWeave.CanonicalRegion("nestedBody", "repeat", "body",
+                        "inside", "inside", List.of("inside"), "parent")
+        ));
+
+        var result = ArcaneWeave.validateCanonical(invalid, registry);
+        assertTrue(result.diagnostics().stream()
+                .anyMatch(issue -> issue.code().equals("CANONICAL_UNBOUND_REQUIRED_INPUT")));
+        assertTrue(result.diagnostics().stream()
+                .anyMatch(issue -> issue.code().equals("CANONICAL_REGION_OWNER_OUTSIDE_PARENT")) == false);
+        assertTrue(result.diagnostics().stream()
+                .noneMatch(issue -> issue.code().equals("CANONICAL_REGION_OVERLAP")));
+    }
+
 }
