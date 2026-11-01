@@ -18,6 +18,7 @@ public final class CanonicalWeaveScheduler {
     private final Map<String, CanonicalControlFlowPlan.RegionPlan> regions = new HashMap<>();
     private final Map<String, CanonicalControlFlowPlan.BranchPlan> branches = new HashMap<>();
     private final Map<String, CanonicalControlFlowPlan.RepeatPlan> repeats = new HashMap<>();
+    private boolean executed;
 
     public CanonicalWeaveScheduler(ArcaneWeave.CanonicalWeave weave,
             ArcaneWeave.StandardSymbolRegistry registry,
@@ -57,8 +58,13 @@ public final class CanonicalWeaveScheduler {
     public Result execute() { return execute(() -> false); }
 
     /** Cancellation is checked between interpreter steps; no partial result is reported as success. */
-    public Result execute(BooleanSupplier cancellationRequested) {
+    public synchronized Result execute(BooleanSupplier cancellationRequested) {
         Runtime state = new Runtime(Objects.requireNonNull(cancellationRequested));
+        if (executed) {
+            state.diagnostics.add("A scheduler instance is one-shot and cannot execute the same cast twice.");
+            return result(Status.FAILED, state);
+        }
+        executed = true;
         Status status = preflight(state);
         if (status != null) return result(status, state);
         if (hasControlFlow() && plan.rootEntryGlyphs().isEmpty()) {
