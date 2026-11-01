@@ -47,6 +47,11 @@ class CanonicalExecutionBudgetTest {
                 session.beginLoopIteration("repeat", "activationB", 4));
         assertEquals(5, session.snapshot().loopIterations().values().stream()
                 .mapToInt(Integer::intValue).sum());
+        assertEquals(CanonicalExecutionBudget.Admission.ACCEPTED,
+                session.finishLoop("repeat", "activationA"));
+        assertEquals(CanonicalExecutionBudget.Admission.ACCEPTED,
+                session.beginLoopIteration("repeat", "activationA", 4));
+        assertEquals(2, session.snapshot().loopIterations().get("repeat#activationA"));
     }
 
     @Test
@@ -69,6 +74,10 @@ class CanonicalExecutionBudgetTest {
         assertEquals(CanonicalExecutionBudget.Admission.INVALID_REQUEST, session.reserveRuntimeValues(-1));
         assertEquals(CanonicalExecutionBudget.Admission.ACCEPTED, session.reserveRuntimeValues(2));
         assertEquals(5, session.snapshot().runtimeValues());
+        assertEquals(CanonicalExecutionBudget.Admission.ACCEPTED, session.releaseRuntimeValues(3));
+        assertEquals(CanonicalExecutionBudget.Admission.INVALID_STATE, session.releaseRuntimeValues(3));
+        assertEquals(CanonicalExecutionBudget.Admission.INVALID_REQUEST, session.releaseRuntimeValues(-1));
+        assertEquals(2, session.snapshot().runtimeValues());
     }
 
     @Test
