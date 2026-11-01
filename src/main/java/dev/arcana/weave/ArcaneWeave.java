@@ -139,7 +139,7 @@ public final class ArcaneWeave {
                     ports("flow", Essence.SIGNAL), Map.of(),
                     ControlFlow.JOIN, 2, null, true));
             add(defs, symbol("arcana:control/repeat", "control",
-                    ports("flow", Essence.SIGNAL), ports("next", Essence.SIGNAL),
+                    ports("flow", Essence.SIGNAL), ports("body", Essence.SIGNAL, "completed", Essence.SIGNAL),
                     params(integerParameter("maxIterations", true, 1, MAX_REPETITIONS)),
                     ControlFlow.LOOP, 4, null, true));
 
@@ -193,7 +193,7 @@ public final class ArcaneWeave {
             add(defs, symbol("arcana:effect/light", "effect",
                     ports("position", Essence.VECTOR3, "level", Essence.NUMBER, "flow", Essence.SIGNAL),
                     ports("complete", Essence.SIGNAL), Map.of(),
-                    ControlFlow.TERMINAL, 3, "arcana:world/set_light", true));
+                    ControlFlow.LINEAR, 3, "arcana:world/set_light", true));
 
             return new StandardSymbolRegistry(defs);
         }
