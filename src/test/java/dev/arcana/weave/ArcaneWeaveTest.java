@@ -60,7 +60,7 @@ class ArcaneWeaveTest {
         var invocation = new ArcaneWeave.Glyph("begin", ArcaneWeave.GlyphKind.INVOCATION,
                 Map.of("out", ArcaneWeave.Essence.SIGNAL), Map.of(), Map.of());
         var transform = new ArcaneWeave.Glyph("shape", ArcaneWeave.GlyphKind.TRANSFORM,
-                Map.of("in", ArcaneWeave.Essence.SIGNAL), Map.of("out", ArcaneWeave.Essence.SIGNAL), Map.of());
+                Map.of("out", ArcaneWeave.Essence.SIGNAL), Map.of("in", ArcaneWeave.Essence.SIGNAL), Map.of());
         var manifestation = new ArcaneWeave.Glyph("end", ArcaneWeave.GlyphKind.MANIFESTATION,
                 Map.of(), Map.of("in", ArcaneWeave.Essence.SIGNAL), Map.of());
         var weave = new ArcaneWeave.Weave("arcana:cycle", 1, List.of(invocation, transform, manifestation),
