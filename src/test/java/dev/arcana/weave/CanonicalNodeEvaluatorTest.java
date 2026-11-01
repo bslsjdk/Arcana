@@ -116,12 +116,13 @@ class CanonicalNodeEvaluatorTest {
 
     @Test
     void outputSlotBudgetIsSeparateFromNodeStepBudget() {
-        var evaluator = new CanonicalNodeEvaluator(addWeave(), registry, budget(10, 0));
+        var evaluator = new CanonicalNodeEvaluator(addWeave(), registry, budget(10, 1));
 
+        assertEquals(CanonicalNodeEvaluator.Status.EVALUATED, evaluator.evaluate("a").status());
         assertEquals(CanonicalNodeEvaluator.Status.BUDGET_EXHAUSTED,
-                evaluator.evaluate("a").status());
-        assertEquals(1, evaluator.budgetSnapshot().nodeSteps());
-        assertEquals(0, evaluator.budgetSnapshot().runtimeValues());
+                evaluator.evaluate("b").status());
+        assertEquals(2, evaluator.budgetSnapshot().nodeSteps());
+        assertEquals(1, evaluator.budgetSnapshot().runtimeValues());
     }
 
     @Test
