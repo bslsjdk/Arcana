@@ -76,15 +76,20 @@ public final class CanonicalExecutionBudget {
          * declared bound; INVALID_REQUEST means its declaration exceeds the
          * server-side policy or its identifier is malformed.
          */
-        public Admission beginLoopIteration(String loopId, int declaredMaximum) {
-            if (loopId == null || !loopId.matches("[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}"))
+        public Admission beginLoopIteration(String loopId, String activationId, int declaredMaximum) {
+            if (!isIdentifier(loopId) || !isIdentifier(activationId))
                 return Admission.INVALID_REQUEST;
             if (declaredMaximum < 1 || declaredMaximum > limits.maximumIterationsPerLoop())
                 return Admission.INVALID_REQUEST;
-            int completed = loopIterations.getOrDefault(loopId, 0);
+            String activationKey = loopId + "#" + activationId;
+            int completed = loopIterations.getOrDefault(activationKey, 0);
             if (completed >= declaredMaximum) return Admission.LIMIT_REACHED;
-            loopIterations.put(loopId, completed + 1);
+            loopIterations.put(activationKey, completed + 1);
             return Admission.ACCEPTED;
+        }
+
+        private static boolean isIdentifier(String value) {
+            return value != null && value.matches("[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}");
         }
 
         /** Reserves runtime value slots without partially changing state on failure. */
