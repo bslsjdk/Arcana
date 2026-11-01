@@ -1,32 +1,48 @@
 # Arcana
 
-**Arcana** is a Java Edition Minecraft magic mod built around a programmable magic system.
+**Arcana** is a Java Edition Minecraft magic mod for Minecraft 1.21.1, NeoForge 21.1.264, and Java 21.
 
-Its central idea is that players may invent their own magical languages, but every player language is translated into one canonical, versioned Arcana language before compilation and execution.
+Its defining idea is that players may invent their own magical languages. Those languages are translated into one canonical, versioned Arcana language, then parsed and validated by a shared engine. The player's original text is never executed directly.
 
-The long-term goal is not merely to add a collection of spells. It is to provide a flexible framework in which spells, rituals, alchemy, artifacts, magical machines, creatures, and even custom dimensions can be described as composable magical programs.
+The long-term goal is not merely a collection of spells. Arcana aims to provide a programmable magic framework for spells, rituals, alchemy, artifacts, magical machines, creatures, and custom dimensions.
 
 ## Design pillars
 
-1. **Player expression is open.** Players define vocabulary, symbols, grammar, and syntax for their own languages.
-2. **Execution is canonical.** Player-authored languages translate into the same standard Arcana representation.
-3. **Meaning is explicit.** Translation must preserve declared meaning; ambiguity and unknown terms are errors, never guesses.
-4. **Power comes from composition.** Reusable modules, functions, types, data, conditions, and long-running plans form complex magic.
-5. **Capabilities are extensible.** The mod and compatible addons can register new typed operations without rewriting the language front end.
-6. **Execution is controlled.** Compiled magic runs through a bounded runtime with permissions, resource accounting, validation, persistence, and failure handling.
-7. **Complexity is meaningful.** Advanced magic is difficult because it expresses many real dependencies and constraints, not because it contains decorative filler.
+1. Player expression is open: custom vocabulary, symbols, grammar, and syntax.
+2. Execution is canonical: every language targets the same standard representation.
+3. Meaning is explicit: unknown or ambiguous input is rejected, never guessed.
+4. Power comes from composition: typed operations, reusable modules, and complex programs.
+5. Capabilities are extensible through documented mod APIs.
+6. Execution is bounded, permission-checked, and server-authoritative.
+7. Complexity comes from meaningful rules and dependencies, not decorative text.
 
-## Project status
+## Current implementation
 
-The repository is currently at the design/bootstrap stage. The architecture is being specified before gameplay content is implemented.
+The first implementation branch establishes:
+- a NeoForge 1.21.1 / Java 21 project;
+- a bounded canonical-language lexer;
+- a recursive-descent parser for the initial spell syntax;
+- a versioned player-language keyword alias translator;
+- unit tests for parsing, translation equivalence, and malformed input.
 
-See [Architecture](docs/ARCHITECTURE.md) for the proposed system boundaries, compilation pipeline, runtime model, and development milestones.
+The v0.1 translator currently maps vocabulary aliases for canonical keywords. It does **not yet** support arbitrary grammar rewrites or word-order changes. Those are planned next; the engine must never guess missing grammar or meaning.
 
-## Initial development policy
+See:
+- [Architecture](docs/ARCHITECTURE.md)
+- [Canonical grammar v0.1](docs/language/CANONICAL_GRAMMAR.md)
 
-- Keep the language specification independent from Minecraft-version-specific APIs.
-- Keep Minecraft integration behind adapters.
-- Do not execute arbitrary Java, scripts, reflection payloads, or player-provided bytecode.
-- Treat player language definitions and spellbooks as untrusted data.
-- Version language definitions, canonical syntax, IR, and saved programs.
-- Build automated tests for parsing, translation, type checking, validation, serialization, and runtime behavior before adding large content systems.
+## Build
+
+Requires a 64-bit JDK 21.
+
+- Windows: `gradlew.bat build`
+- Linux/macOS: `./gradlew build`
+
+The first Gradle setup downloads Minecraft and NeoForge development dependencies and may take a while.
+
+## Safety and compatibility policy
+
+- No arbitrary Java, reflection, class loading, filesystem, network, or command execution from spell source.
+- Player-authored language definitions and spellbooks are untrusted input.
+- Language definitions, canonical syntax, and saved programs are versioned.
+- All world mutations must pass through server-side capabilities, permissions, resource checks, and execution budgets.
