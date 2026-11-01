@@ -159,3 +159,27 @@ Here, each `<...-glyph>` placeholder means the actual one-character private-use 
 Current v1 scalar parameters are deliberately limited to finite-looking decimal/integer syntax and boolean literals; the registry remains the authority for the actual parameter type and range. String literals and arbitrary expressions are not supported. Duplicate instance IDs, duplicate parameters, unknown characters, malformed connections, and any registry validation error fail closed.
 
 The codec supports deterministic `encodeWeave` and `parseWeave` round trips for the current flat canonical graph model. It does **not** yet add nested sub-weaves, explicit branch-region bodies, or bounded-loop body ownership. The existing repeat symbol is still only a registered symbol with a bounded `maxIterations` parameter; the runtime meaning of its body remains future work. Do not treat this codec as a complete executable magic language yet.
+
+
+## 11. Structured control regions v1
+
+The canonical weave model now carries explicit `CanonicalRegion` records in addition to glyph instances and typed connections. A region records:
+
+- a stable region ID;
+- the controlling glyph instance and its standard output port;
+- entry and exit glyph instances;
+- the complete member-glyph list;
+- an optional parent-region ID.
+
+A branch must own exactly the two named arms `whenTrue` and `whenFalse`. A bounded repeat must own its `body` region. Other symbol families cannot claim control regions. Region IDs and members are validated, region boundaries must be members, a region cannot contain its own owner, and nested regions must remain entirely inside their parent. Unrelated/sibling regions cannot claim the same glyph instances, and parent references must form an acyclic containment forest.
+
+The direct script codec now serializes regions with declarations of this form:
+
+```text
+^repeatBody(repeat.body)[bodyStart>bodyEnd](bodyStart,work,bodyEnd)@-;
+^nestedArm(branch.whenTrue)[innerStart>innerEnd](innerStart,innerEnd)@outerArm;
+```
+
+The parent marker `-` means a top-level region; otherwise it names the containing region. Member IDs are explicit and ordered. These declarations are metadata for structural ownership, not a claim that branch/repeat runtime execution is already implemented.
+
+This milestone establishes **structural containment**, not a complete control-flow interpreter. The next required step is to validate boundary connections and define the exact execution contract for branch selection, repeat iteration, body completion, and loop exit. Until that exists, region-aware canonical weaves can be validated and serialized but must not be executed.
