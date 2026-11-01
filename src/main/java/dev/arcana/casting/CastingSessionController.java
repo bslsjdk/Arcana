@@ -4,9 +4,10 @@ import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * Owns the pending/active lifecycle for one player's current incantation.
- * It does not compile or execute a weave; a future runtime adapter consumes
- * the prepared payload after the activation transition.
+ * Owns the trigger-driven lifecycle for ordinary voice-command input only.
+ * It must not be used as the controller for the dedicated casting window,
+ * which has its own direct-submit lifecycle. It does not compile or execute a
+ * weave; a future runtime adapter consumes the payload after activation.
  */
 public final class CastingSessionController {
     private final CastingTriggerRecognizer.TriggerProfile triggerProfile;
