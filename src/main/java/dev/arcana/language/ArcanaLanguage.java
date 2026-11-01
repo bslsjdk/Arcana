@@ -176,6 +176,9 @@ public final class ArcanaLanguage {
             Objects.requireNonNull(id);
             Objects.requireNonNull(keywordAliases);
             phraseRules = List.copyOf(Objects.requireNonNull(phraseRules));
+            if (phraseRules.size() > 256) {
+                throw new IllegalArgumentException("A language may define at most 256 phrase rules.");
+            }
             if (!id.matches("[a-z0-9_.-]+:[a-z0-9_./-]+")) {
                 throw new IllegalArgumentException("Language id must be namespaced.");
             }
