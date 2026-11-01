@@ -1,6 +1,6 @@
 # Canonical Glyph Script
 
-Status: **design specification; direct glyph authoring and the custom font are not implemented yet**
+Status: **identity table and codec implemented; final visual design, direct weave parser, and custom font are not implemented yet**
 
 ## 1. The distinction that the model must preserve
 
@@ -99,3 +99,19 @@ A player may also use canonical glyphs and personal-language text together in on
 7. Add round-trip, unknown-glyph, ambiguous-boundary, version-migration, and direct-vs-translated equivalence tests.
 
 Until these steps are complete, the current registry-backed symbol IDs are an ownership prototype, not a finished magic alphabet or a playable direct-writing system.
+
+
+## 9. Canonical script identity table v1
+
+The code now contains `CanonicalScript`, a versioned identity table for the 18 currently concrete built-in symbols.
+
+- Each concrete symbol ID maps to one stable script slot.
+- The current transport slots occupy Unicode Private Use Area code points U+E000 through U+E011.
+- The mapping is owned by Arcana and exposed as an immutable table.
+- Encoding an unknown symbol ID fails; decoding an unknown character produces a diagnostic instead of inventing a symbol.
+- Whitespace is currently ignored between glyphs.
+- Round-trip tests verify that encoding and decoding preserve the exact canonical symbol IDs.
+
+These PUA values are **not the final visual alphabet**. Without the Arcana font, they may render as empty boxes or fallback symbols. They are stable identity/transport slots for this script-table version, not semantic IDs. A future font can draw original forms for these slots without changing their meanings.
+
+The current codec only decodes a flat sequence of symbol references. It does not yet encode parameters, instance identifiers, typed connections, nesting, or complete canonical weaves. A sequence of glyphs is therefore not automatically a valid executable construction; the graph model and validator remain authoritative until the structured script grammar is implemented.
