@@ -1,7 +1,5 @@
 package dev.arcana.profile;
 
-import dev.arcana.casting.CastingTriggerRecognizer;
-import dev.arcana.language.ArcanaLanguage;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
@@ -53,6 +51,7 @@ public final class PlayerArcanaProfilesSavedData extends SavedData {
     }
 
     public void putProfile(UUID playerId, PlayerArcanaProfile profile) {
+        Objects.requireNonNull(profile, "profile");
         if (store.get(playerId).filter(profile::equals).isPresent()) return;
         store.put(playerId, profile);
         setDirty();
