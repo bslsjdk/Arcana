@@ -136,7 +136,7 @@ class CanonicalNodeEvaluatorTest {
 
     private static long budgetSnapshotSteps(CanonicalNodeEvaluator evaluator) {
         // The evaluator and its value store share this per-cast session.
-        return evaluator.executionStepsForTesting();
+        return evaluator.budgetSnapshot().nodeSteps();
     }
 
     private static ArcaneWeave.CanonicalGlyph glyph(
