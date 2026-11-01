@@ -25,6 +25,115 @@ public final class ArcaneWeave {
     private ArcaneWeave() { }
 
     public enum Essence { MANA, SIGNAL, BOOLEAN, NUMBER, TEXT, VECTOR3 }
+
+    /**
+     * Canonical symbol reference used by the registry-backed authoring model.
+     * The instance carries only an Arcana-owned symbol id and data parameters;
+     * it cannot declare ports, operations, or semantic behavior.
+     */
+    public record CanonicalGlyph(String instanceId, String symbolId, Map<String, String> parameters) {
+        public CanonicalGlyph {
+            requireIdentifier(instanceId, "glyph instance id");
+            requireNamespacedId(symbolId, "standard symbol id");
+            parameters = Map.copyOf(Objects.requireNonNull(parameters, "parameters"));
+            if (parameters.size() > 32) throw new IllegalArgumentException("Too many symbol parameters.");
+        }
+    }
+
+    /** Registry-backed canonical weave. Player data can reference symbols but cannot define them. */
+    public record CanonicalWeave(String id, int version, List<CanonicalGlyph> glyphs) {
+        public CanonicalWeave {
+            requireNamespacedId(id, "weave id");
+            if (version < 1) throw new IllegalArgumentException("Weave version must be positive.");
+            glyphs = List.copyOf(Objects.requireNonNull(glyphs, "glyphs"));
+            if (glyphs.size() > MAX_GLYPHS) throw new IllegalArgumentException("Weave exceeds the glyph limit.");
+        }
+    }
+
+    public record SymbolDiagnostic(String code, String message, String glyphId) { }
+
+    public record SymbolValidation(List<SymbolDiagnostic> diagnostics) {
+        public SymbolValidation { diagnostics = List.copyOf(diagnostics); }
+        public boolean valid() { return diagnostics.isEmpty(); }
+    }
+
+    /** The one built-in registry is immutable and owned by Arcana, not player language data. */
+    public static final class StandardSymbolRegistry {
+        private final Map<String, Set<String>> parameterKeys;
+
+        private StandardSymbolRegistry(Map<String, Set<String>> definitions) {
+            Map<String, Set<String>> copy = new LinkedHashMap<>();
+            definitions.forEach((id, keys) -> {
+                requireNamespacedId(id, "standard symbol id");
+                copy.put(id, Set.copyOf(keys));
+            });
+            parameterKeys = Map.copyOf(copy);
+        }
+
+        public static StandardSymbolRegistry builtins() {
+            Map<String, Set<String>> definitions = new LinkedHashMap<>();
+            definitions.put("arcana:invocation", Set.of());
+            definitions.put("arcana:transform", Set.of());
+            definitions.put("arcana:branch", Set.of());
+            definitions.put("arcana:nexus", Set.of());
+            definitions.put("arcana:repetition", Set.of("maxIterations"));
+            definitions.put("arcana:ward", Set.of());
+            definitions.put("arcana:sigil", Set.of());
+            definitions.put("arcana:core", Set.of());
+            definitions.put("arcana:manifestation", Set.of());
+            return new StandardSymbolRegistry(definitions);
+        }
+
+        public boolean contains(String symbolId) {
+            return parameterKeys.containsKey(symbolId);
+        }
+
+        public Set<String> allowedParameters(String symbolId) {
+            return parameterKeys.getOrDefault(symbolId, Set.of());
+        }
+
+        public Set<String> symbolIds() { return parameterKeys.keySet(); }
+    }
+
+    public static SymbolValidation validateCanonical(CanonicalWeave weave, StandardSymbolRegistry registry) {
+        Objects.requireNonNull(weave, "weave");
+        Objects.requireNonNull(registry, "registry");
+        List<SymbolDiagnostic> issues = new ArrayList<>();
+        if (weave.glyphs().isEmpty()) {
+            issues.add(new SymbolDiagnostic("CANONICAL_WEAVE_EMPTY", "A canonical weave must contain at least one standard symbol.", null));
+        }
+        Set<String> instances = new HashSet<>();
+        for (CanonicalGlyph glyph : weave.glyphs()) {
+            if (!instances.add(glyph.instanceId())) {
+                issues.add(new SymbolDiagnostic("CANONICAL_DUPLICATE_INSTANCE", "Duplicate glyph instance id.", glyph.instanceId()));
+            }
+            if (!registry.contains(glyph.symbolId())) {
+                issues.add(new SymbolDiagnostic("CANONICAL_UNKNOWN_SYMBOL", "Symbol is not registered by Arcana: " + glyph.symbolId(), glyph.instanceId()));
+                continue;
+            }
+            Set<String> allowed = registry.allowedParameters(glyph.symbolId());
+            for (String parameter : glyph.parameters().keySet()) {
+                if (!allowed.contains(parameter)) {
+                    issues.add(new SymbolDiagnostic("CANONICAL_UNKNOWN_PARAMETER",
+                            "Parameter is not defined by the standard symbol: " + parameter, glyph.instanceId()));
+                }
+            }
+            if (glyph.symbolId().equals("arcana:repetition")) {
+                int count;
+                try { count = Integer.parseInt(glyph.parameters().getOrDefault("maxIterations", "")); }
+                catch (NumberFormatException ex) {
+                    issues.add(new SymbolDiagnostic("CANONICAL_REPETITION_UNBOUNDED",
+                            "The standard repetition symbol requires maxIterations.", glyph.instanceId()));
+                    continue;
+                }
+                if (count < 1 || count > MAX_REPETITIONS) {
+                    issues.add(new SymbolDiagnostic("CANONICAL_REPETITION_LIMIT",
+                            "maxIterations is outside the supported bound.", glyph.instanceId()));
+                }
+            }
+        }
+        return new SymbolValidation(issues);
+    }
     public enum GlyphKind { INVOCATION, TRANSFORM, BRANCH, NEXUS, REPETITION, WARD, SIGIL, CORE, MANIFESTATION }
     public enum HostKind { PAGE, ITEM, BLOCK, STRUCTURE_PART }
 
