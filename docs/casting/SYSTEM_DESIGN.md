@@ -133,9 +133,11 @@ The repository currently contains:
 - a bounded canonical-language lexer/parser and a small canonical AST;
 - a v0.1 translator that maps vocabulary aliases only;
 - static semantic validation;
-- a loader-independent casting-rules prototype;
+- a loader-independent casting-rules prototype where rank represents control capacity, not knowledge;
 - registered grimoire, focus crystal, and scroll items;
-- an initial typed graph prototype in ArcanaCircuit.
+- an initial ArcaneWeave domain model with typed magical essences, mana veins, host anchors, placements, and explicit links between hosts.
+
+The older ArcanaCircuit graph is a legacy technical prototype and is not the player-facing design vocabulary.
 
 The translator does **not** yet support arbitrary grammar productions, word-order changes, inflection, or syntax templates. The graph prototype is an internal technical foundation, not a finished player-facing magical-weave editor. Hosts, installations, cross-host connections, capabilities, mana, persistence, and actual casting are not yet implemented.
 
