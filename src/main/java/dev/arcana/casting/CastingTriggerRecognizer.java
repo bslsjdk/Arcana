@@ -154,8 +154,8 @@ public final class CastingTriggerRecognizer {
 
         if (firstCancellation != null
                 && (firstActivation == null || cancellationIndex < activationIndex)) {
-            return new Result(Status.CANCELLED, "", firstActivation != null, true,
-                    activationIndex, cancellationIndex,
+            return new Result(Status.CANCELLED, "", false, true,
+                    -1, cancellationIndex,
                     "Cancellation occurred before activation; pending incantation discarded.");
         }
 
