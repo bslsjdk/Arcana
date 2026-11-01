@@ -36,11 +36,17 @@ The mapping cardinality is intentionally unrestricted by the design:
 
 All mappings must be deterministic. Conflicting rules, ambiguous matches without a unique contextual resolution, unknown canonical targets, and unsupported constructs must be rejected rather than guessed.
 
-## Translation v0.1
+## Translation v0.2
 
-A player language currently provides a versioned, case-insensitive alias table for canonical syntax keywords and built-in type names. Translation is deterministic and preserves string literals and formatting.
+A player language provides:
+- a versioned, case-insensitive alias table for canonical syntax keywords and built-in type names;
+- deterministic phrase rules that match token sequences and replace them with canonical Arcana source fragments;
+- longest-match selection when phrase patterns overlap by prefix;
+- rejection of duplicate phrase patterns and collisions between single-token phrase rules and keyword aliases.
 
-This is the first vertical slice, not the final language-authoring model. Custom grammar productions, word-order changes, affixes, phrase-level mappings, and syntax templates are planned for a later translator milestone. They must translate into the same canonical syntax tree and must never infer missing meaning.
+Phrase rules support many source tokens mapping to one canonical token, and one short source token expanding into a larger canonical program. Replacement output is bounded to 65536 characters. Phrase matching operates on the current canonical lexer token model, preserves untouched source text, and does not rewrite text inside unmatched string literals.
+
+This is an incremental phrase-expansion layer, not a complete natural-language grammar engine. Arbitrary grammar productions, word-order transformations, inflection/morphology, syntax trees as rule patterns, and context-sensitive disambiguation remain future work. Translation output must still be parsed and semantically validated by the canonical pipeline; unsupported or ambiguous meaning must never be guessed.
 
 ## Cost and resource accounting
 
