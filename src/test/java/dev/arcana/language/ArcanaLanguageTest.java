@@ -65,6 +65,57 @@ class ArcanaLanguageTest {
     }
 
     @Test
+    void mapsLongPhraseToOneCanonicalToken() {
+        var language = new ArcanaLanguage.LanguageDefinition("player:poetic", 1, Map.of(),
+                java.util.List.of(new ArcanaLanguage.PhraseRule(
+                        "when the silver moon awakens", "spell")));
+        var translated = ArcanaLanguage.translate(
+                "when the silver moon awakens \"spark\" {}", language);
+
+        assertTrue(translated.successful(), () -> translated.diagnostics().toString());
+        assertEquals("spell \"spark\" {}", translated.canonicalSource());
+    }
+
+    @Test
+    void mapsOneShortWordToAComplexCanonicalStructure() {
+        String expansion = """
+                spell "spark" {
+                    let power: Number = 2;
+                    invoke "arcana:effect/ignite"(power = power);
+                }
+                """;
+        var language = new ArcanaLanguage.LanguageDefinition("player:compact", 1, Map.of(),
+                java.util.List.of(new ArcanaLanguage.PhraseRule("x", expansion)));
+        var translated = ArcanaLanguage.translate("x", language);
+
+        assertTrue(translated.successful(), () -> translated.diagnostics().toString());
+        var parsed = ArcanaLanguage.parse(translated.canonicalSource());
+        assertTrue(parsed.successful(), () -> parsed.diagnostics().toString());
+        assertEquals(2, parsed.program().statements().size());
+    }
+
+    @Test
+    void rejectsConflictingDuplicatePhrasePatterns() {
+        assertThrows(IllegalArgumentException.class, () ->
+                new ArcanaLanguage.LanguageDefinition("player:ambiguous", 1, Map.of(),
+                        java.util.List.of(
+                                new ArcanaLanguage.PhraseRule("moon rises", "spell"),
+                                new ArcanaLanguage.PhraseRule("moon rises", "invoke"))));
+    }
+
+    @Test
+    void prefersTheLongestMatchingPhraseRule() {
+        var language = new ArcanaLanguage.LanguageDefinition("player:longest", 1, Map.of(),
+                java.util.List.of(
+                        new ArcanaLanguage.PhraseRule("silver moon", "let"),
+                        new ArcanaLanguage.PhraseRule("silver moon rises", "invoke")));
+        var translated = ArcanaLanguage.translate("silver moon rises", language);
+
+        assertTrue(translated.successful());
+        assertEquals("invoke", translated.canonicalSource());
+    }
+
+    @Test
     void enforcesInputSizeLimit() {
         var lex = ArcanaLanguage.lex("x".repeat(65_537));
         assertTrue(lex.hasErrors());
