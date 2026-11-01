@@ -287,3 +287,11 @@ This is a design baseline, not an implemented feature. Audio capture, speech rec
 The recognizer returns a decision and payload only. It does not itself start or stop a cast, invoke `CanonicalWeaveScheduler`, access Minecraft, or mutate the world. A casting-session controller must consume the result and own pending/active/cancelled lifecycle state. The current recognizer analyzes complete batches; incremental audio capture, speech recognition, cross-batch partial-phrase buffering, persistent trigger profiles, and the in-game configuration UI remain future work.
 
 Tests cover activation placement, ordered cancellation, multi-word phrases, exact-token matching, Unicode compatibility normalization, overlapping-trigger rejection, and input limits.
+
+## 18. First casting-session controller implementation
+
+`CastingSessionController` owns one player's current pending or active incantation and consumes `CastingTriggerRecognizer` decisions. Its lifecycle is `IDLE -> PREPARED -> RUNNING -> COMPLETED`, with terminal `FAILED` and `CANCELLED` outcomes. Pending source batches accumulate until activation; when activation appears in a later batch, the prepared prefix and the post-activation payload are joined in source order. Ordinary later batches can continue the active incantation.
+
+A cancellation before activation discards pending text. A cancellation after activation, including one later in the same batch, enters `CANCELLED` and raises a thread-safe cooperative cancellation signal for a future runtime adapter. Ambiguous or invalid input fails closed; if a runtime was active, the controller raises cancellation before entering `FAILED`. Terminal sessions cannot accept more input until explicitly reset.
+
+This controller still does not translate the accumulated source, create a canonical weave, instantiate a scheduler, or execute world effects. Its payload is untrusted source text. Runtime integration must translate and validate it before any execution and must observe the cancellation signal at bounded interpreter steps.
