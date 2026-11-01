@@ -235,3 +235,15 @@ Every evaluation of a member glyph consumes one node step before evaluation. Unk
 Numeric outputs remain bounded by the runtime value type's precision and scale limits. Position components must be finite. The evaluator and its value store share the same per-cast budget session. Its exposed budget snapshot is immutable.
 
 This is still a deliberately small evaluator, not the full scheduler. It does not automatically order nodes, execute branch or repeat regions, evaluate control-flow signals, resolve entity/block references, inspect Minecraft state, mutate the world, authorize capabilities, or consume mana. A future scheduler must choose evaluation order from the validated control-flow plan and explicit data dependencies, and must treat an unavailable input as a scheduling/dependency condition rather than retrying without bounds.
+
+
+
+## 15. Deterministic pure-data scheduling (first scheduler milestone)
+
+`CanonicalWeaveScheduler` now consumes a validated immutable control-flow plan and a per-cast budget session. Before evaluating anything, it verifies that the plan belongs to the exact weave/version and preflights every symbol. This prevents a partially executed cast from discovering halfway through that it contains an unsupported world or control operation.
+
+For the currently supported pure-data subset, the scheduler builds a dependency graph from explicit canonical connections and performs deterministic topological ordering. Ready nodes are selected by canonical instance ID, so equivalent input orderings do not create arbitrary scheduling differences. Each node is evaluated once; unavailable inputs are not retried in an unbounded loop. The evaluator and scheduler share one per-cast value store and node-step budget.
+
+The scheduler currently supports numeric/position references, addition, numeric equality, and less-than. It rejects registered but unevaluated perception, mana, reference, constraint, and effect operations before executing any node. It also rejects branch, join, repeat, and other non-entry control-flow execution until their interpreter semantics are implemented. The control-flow plan is checked for exact weave identity, but this milestone does not pretend that merely compiling branch/repeat metadata executes it.
+
+The scheduler is deterministic and bounded, but it is not yet a playable casting runtime: it does not access Minecraft, spend mana, authorize capabilities, mutate the world, install a weave on a host, or provide cancellation/resumption. These remain separate milestones.
