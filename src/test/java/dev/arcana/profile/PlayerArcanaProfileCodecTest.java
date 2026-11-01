@@ -105,12 +105,10 @@ class PlayerArcanaProfileCodecTest {
 
     @Test
     void rejectsOversizedAliasAndPhraseConfigurations() {
-        var language = new ArcanaLanguage.LanguageDefinition(
-                "player:bad", 1,
-                Map.of("x".repeat(129), "spell"), List.of());
-        assertThrows(IllegalArgumentException.class,
-                () -> new PlayerArcanaProfile(language,
-                        new CastingTriggerRecognizer.TriggerProfile(
-                                List.of("go"), List.of("stop"))));
+        assertThrows(IllegalArgumentException.class, () ->
+                new ArcanaLanguage.LanguageDefinition(
+                        "player:bad", 1, Map.of("x".repeat(129), "spell"), List.of()));
+        assertThrows(IllegalArgumentException.class, () ->
+                new ArcanaLanguage.PhraseRule("x", "z".repeat(4_097)));
     }
 }
