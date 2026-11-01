@@ -65,8 +65,10 @@ public final class CanonicalWeaveScheduler {
             state.diagnostics.add("Control-flow graph has no root entry.");
             return result(Status.FAILED, state);
         }
-        status = evaluatePureData(state);
-        if (status != null) return result(status, state);
+        if (!hasControlFlow()) {
+            status = evaluateAllPureData(state);
+            if (status != null) return result(status, state);
+        }
         for (String root : plan.rootEntryGlyphs()) {
             if (state.cancelled()) return result(Status.CANCELLED, state);
             status = walkFlow(root, null, state);
@@ -101,47 +103,75 @@ public final class CanonicalWeaveScheduler {
         return null;
     }
 
-    private Status evaluatePureData(Runtime state) {
+    private Status evaluateAllPureData(Runtime state) {
         List<String> ids = weave.glyphs().stream()
                 .filter(g -> registry.definition(g.symbolId()).controlFlow() == ArcaneWeave.ControlFlow.DATA)
                 .map(ArcaneWeave.CanonicalGlyph::instanceId).sorted().toList();
-        Set<String> data = Set.copyOf(ids);
-        Map<String, Integer> indegree = new HashMap<>();
-        Map<String, List<String>> outgoing = new HashMap<>();
-        ids.forEach(id -> { indegree.put(id, 0); outgoing.put(id, new ArrayList<>()); });
-        for (var edge : plan.connections()) {
-            if (data.contains(edge.fromGlyph()) && data.contains(edge.toGlyph())) {
-                outgoing.get(edge.fromGlyph()).add(edge.toGlyph());
-                indegree.compute(edge.toGlyph(), (k, v) -> v + 1);
-            }
+        for (String id : ids) {
+            Status status = evaluateDataDependency(id, state, new HashSet<>());
+            if (status != null) return status;
         }
-        outgoing.values().forEach(v -> v.sort(Comparator.naturalOrder()));
-        PriorityQueue<String> ready = new PriorityQueue<>();
-        indegree.forEach((id, degree) -> { if (degree == 0) ready.add(id); });
-        int completed = 0;
-        while (!ready.isEmpty()) {
-            if (state.cancelled()) return Status.CANCELLED;
-            String id = ready.remove();
-            var evaluation = evaluator.evaluate(id);
+        return null;
+    }
+
+    /** Evaluate only the transitive inputs needed by a selected branch condition. */
+    private Status evaluateDataDependency(String glyphId, Runtime state, Set<String> visiting) {
+        if (state.evaluatedData.contains(glyphId)) return null;
+        if (state.cancelled()) return Status.CANCELLED;
+        ArcaneWeave.CanonicalGlyph glyph = glyphs.get(glyphId);
+        if (glyph == null) {
+            state.diagnostics.add("Data dependency references unknown glyph '" + glyphId + "'.");
+            return Status.FAILED;
+        }
+        ArcaneWeave.StandardSymbolDefinition definition = registry.definition(glyph.symbolId());
+        if (definition == null || definition.controlFlow() != ArcaneWeave.ControlFlow.DATA
+                || !SUPPORTED_DATA.contains(glyph.symbolId())) {
+            state.diagnostics.add("Branch data dependency '" + glyphId + "' is not a supported pure-data node.");
+            return Status.UNSUPPORTED_SYMBOL;
+        }
+        if (!visiting.add(glyphId)) {
+            state.diagnostics.add("Data dependency cycle detected at '" + glyphId + "'.");
+            return Status.FAILED;
+        }
+        try {
+            List<ArcaneWeave.PortDefinition> inputs = definition.inputs().values().stream()
+                    .sorted(Comparator.comparing(ArcaneWeave.PortDefinition::id)).toList();
+            for (ArcaneWeave.PortDefinition input : inputs) {
+                List<ArcaneWeave.CanonicalConnection> incoming = plan.connections().stream()
+                        .filter(edge -> edge.toGlyph().equals(glyphId) && edge.toPort().equals(input.id()))
+                        .toList();
+                if (incoming.isEmpty()) {
+                    if (input.required()) {
+                        state.diagnostics.add("Required data input '" + input.id()
+                                + "' on glyph '" + glyphId + "' is unbound.");
+                        return Status.FAILED;
+                    }
+                    continue;
+                }
+                if (incoming.size() != 1) {
+                    state.diagnostics.add("Data input '" + input.id()
+                            + "' on glyph '" + glyphId + "' has multiple sources.");
+                    return Status.FAILED;
+                }
+                Status dependencyStatus = evaluateDataDependency(incoming.getFirst().fromGlyph(),
+                        state, visiting);
+                if (dependencyStatus != null) return dependencyStatus;
+            }
+            var evaluation = evaluator.evaluate(glyphId);
             if (!evaluation.successful()) {
-                state.diagnostics.add("Glyph '" + id + "' failed: " + evaluation.status()
+                state.diagnostics.add("Glyph '" + glyphId + "' failed: " + evaluation.status()
                         + (evaluation.diagnostic() == null ? "" : " (" + evaluation.diagnostic() + ")"));
                 return evaluation.status() == CanonicalNodeEvaluator.Status.BUDGET_EXHAUSTED
                         ? Status.BUDGET_EXHAUSTED
                         : evaluation.status() == CanonicalNodeEvaluator.Status.UNSUPPORTED_SYMBOL
                         ? Status.UNSUPPORTED_SYMBOL : Status.FAILED;
             }
-            state.order.add(id);
-            completed++;
-            for (String target : outgoing.get(id)) {
-                if (indegree.compute(target, (k, v) -> v - 1) == 0) ready.add(target);
-            }
+            state.evaluatedData.add(glyphId);
+            state.order.add(glyphId);
+            return null;
+        } finally {
+            visiting.remove(glyphId);
         }
-        if (completed != ids.size()) {
-            state.diagnostics.add("Data dependency graph could not be fully scheduled.");
-            return Status.FAILED;
-        }
-        return null;
     }
 
     private Status walkFlow(String start, CanonicalControlFlowPlan.RegionPlan region, Runtime state) {
@@ -199,6 +229,8 @@ public final class CanonicalWeaveScheduler {
     private String executeBranch(CanonicalControlFlowPlan.BranchPlan branch, Runtime state) {
         Status step = consumeControlStep(branch.ownerGlyph(), state);
         if (step != null) { state.failure = step; return null; }
+        Status conditionStatus = evaluateDataDependency(branch.conditionSourceGlyph(), state, new HashSet<>());
+        if (conditionStatus != null) { state.failure = conditionStatus; return null; }
         var condition = evaluator.valueStore().readInput(branch.ownerGlyph(), "condition");
         if (condition.status() != CanonicalValueStore.Status.RESOLVED
                 || !(condition.value() instanceof CanonicalValueStore.BooleanValue bool)) {
@@ -319,6 +351,7 @@ public final class CanonicalWeaveScheduler {
         private final BooleanSupplier cancellation;
         private final List<String> order = new ArrayList<>();
         private final List<String> diagnostics = new ArrayList<>();
+        private final Set<String> evaluatedData = new HashSet<>();
         private int activationSequence;
         private Status failure;
         private Runtime(BooleanSupplier cancellation) { this.cancellation = cancellation; }
