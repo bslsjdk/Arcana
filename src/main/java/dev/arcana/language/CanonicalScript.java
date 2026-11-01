@@ -154,7 +154,7 @@ public final class CanonicalScript {
         for (var region : weave.regions()) {
             out.append('^').append(region.id()).append('(').append(region.ownerGlyph()).append('.')
                     .append(region.ownerPort()).append(")[")
-                    .append(region.entryGlyph()).append('>').append(region.exitGlyph()).append("](")
+                    .append(region.entryGlyph()).append('>').append(region.exitGlyph()).append('.').append(region.exitPort()).append("](")
                     .append(String.join(",", region.memberGlyphs())).append(")@")
                     .append(region.parentRegionId() == null ? "-" : region.parentRegionId()).append(';');
         }
@@ -189,15 +189,15 @@ public final class CanonicalScript {
                             matcher.group(1), matcher.group(2), matcher.group(3), matcher.group(4)));
                 } else if (declaration.charAt(0) == '^') {
                     java.util.regex.Matcher matcher = java.util.regex.Pattern.compile(
-                            "\\^([a-zA-Z0-9][a-zA-Z0-9_.-]*)\\(([a-zA-Z0-9][a-zA-Z0-9_.-]*)\\.([a-zA-Z][a-zA-Z0-9_]*)\\)\\[([a-zA-Z0-9][a-zA-Z0-9_.-]*)>([a-zA-Z0-9][a-zA-Z0-9_.-]*)\\]\\(([a-zA-Z0-9_.,-]+)\\)@(-|[a-zA-Z0-9][a-zA-Z0-9_.-]*)")
+                            "\\^([a-zA-Z0-9][a-zA-Z0-9_.-]*)\\(([a-zA-Z0-9][a-zA-Z0-9_.-]*)\\.([a-zA-Z][a-zA-Z0-9_]*)\\)\\[([a-zA-Z0-9][a-zA-Z0-9_.-]*)>([a-zA-Z0-9][a-zA-Z0-9_.-]*)\\.([a-zA-Z][a-zA-Z0-9_]*)\\]\\(([a-zA-Z0-9_.,-]+)\\)@(-|[a-zA-Z0-9][a-zA-Z0-9_.-]*)")
                             .matcher(declaration);
                     if (!matcher.matches()) throw new IllegalArgumentException("SCRIPT_INVALID_REGION");
                     List<String> members = java.util.Arrays.stream(matcher.group(6).split(","))
                             .map(String::trim).toList();
                     regions.add(new dev.arcana.weave.ArcaneWeave.CanonicalRegion(
                             matcher.group(1), matcher.group(2), matcher.group(3),
-                            matcher.group(4), matcher.group(5), members,
-                            matcher.group(7).equals("-") ? null : matcher.group(7)));
+                            matcher.group(4), matcher.group(5), matcher.group(6), members,
+                            matcher.group(8).equals("-") ? null : matcher.group(8)));
                 } else {
                     int codePoint = declaration.codePointAt(0);
                     int glyphWidth = Character.charCount(codePoint);
