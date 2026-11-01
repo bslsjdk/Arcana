@@ -151,6 +151,13 @@ public final class CanonicalScript {
             out.append('@').append(connection.fromGlyph()).append('.').append(connection.fromPort())
                     .append('>').append(connection.toGlyph()).append('.').append(connection.toPort()).append(';');
         }
+        for (var region : weave.regions()) {
+            out.append('^').append(region.id()).append('(').append(region.ownerGlyph()).append('.')
+                    .append(region.ownerPort()).append(")[")
+                    .append(region.entryGlyph()).append('>').append(region.exitGlyph()).append("](")
+                    .append(String.join(",", region.memberGlyphs())).append(")@")
+                    .append(region.parentRegionId() == null ? "-" : region.parentRegionId()).append(';');
+        }
         return out.toString();
     }
 
@@ -164,6 +171,7 @@ public final class CanonicalScript {
         List<String> errors = new java.util.ArrayList<>();
         List<dev.arcana.weave.ArcaneWeave.CanonicalGlyph> glyphs = new java.util.ArrayList<>();
         List<dev.arcana.weave.ArcaneWeave.CanonicalConnection> connections = new java.util.ArrayList<>();
+        List<dev.arcana.weave.ArcaneWeave.CanonicalRegion> regions = new java.util.ArrayList<>();
         java.util.Set<String> ids = new java.util.HashSet<>();
         String[] declarations = source.split(";", -1);
         if (declarations.length > 2_561) return new WeaveParseResult(null, List.of("SCRIPT_DECLARATION_LIMIT"));
@@ -179,6 +187,17 @@ public final class CanonicalScript {
                     if (!matcher.matches()) throw new IllegalArgumentException("SCRIPT_INVALID_CONNECTION");
                     connections.add(new dev.arcana.weave.ArcaneWeave.CanonicalConnection(
                             matcher.group(1), matcher.group(2), matcher.group(3), matcher.group(4)));
+                } else if (declaration.charAt(0) == '^') {
+                    java.util.regex.Matcher matcher = java.util.regex.Pattern.compile(
+                            "\\^([a-zA-Z][a-zA-Z0-9_.-]*)\\(([a-zA-Z][a-zA-Z0-9_.-]*)\\.([a-zA-Z][a-zA-Z0-9_]*)\\)\\[([a-zA-Z][a-zA-Z0-9_.-]*)>([a-zA-Z][a-zA-Z0-9_.-]*)\\]\\(([a-zA-Z0-9_.,-]+)\\)@(-|[a-zA-Z][a-zA-Z0-9_.-]*)")
+                            .matcher(declaration);
+                    if (!matcher.matches()) throw new IllegalArgumentException("SCRIPT_INVALID_REGION");
+                    List<String> members = java.util.Arrays.stream(matcher.group(6).split(","))
+                            .map(String::trim).toList();
+                    regions.add(new dev.arcana.weave.ArcaneWeave.CanonicalRegion(
+                            matcher.group(1), matcher.group(2), matcher.group(3),
+                            matcher.group(4), matcher.group(5), members,
+                            matcher.group(7).equals("-") ? null : matcher.group(7)));
                 } else {
                     int codePoint = declaration.codePointAt(0);
                     int glyphWidth = Character.charCount(codePoint);
@@ -216,7 +235,7 @@ public final class CanonicalScript {
         if (!errors.isEmpty()) return new WeaveParseResult(null, errors);
         try {
             var weave = new dev.arcana.weave.ArcaneWeave.CanonicalWeave(
-                    weaveId, version, glyphs, connections);
+                    weaveId, version, glyphs, connections, regions);
             var validation = dev.arcana.weave.ArcaneWeave.validateCanonical(weave, registry);
             if (!validation.valid()) {
                 return new WeaveParseResult(null, validation.diagnostics().stream()
