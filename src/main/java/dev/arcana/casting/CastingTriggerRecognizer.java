@@ -198,8 +198,15 @@ public final class CastingTriggerRecognizer {
             int end = tokens.get(match.endTokenExclusive() - 1).end();
             if (start < copiedUntil || end > endOffset) continue;
             result.append(source, copiedUntil, start);
-            result.append(' ');
-            copiedUntil = end;
+            int nextOffset = end;
+            if (result.length() > 0 && Character.isWhitespace(result.charAt(result.length() - 1))) {
+                while (nextOffset < endOffset && Character.isWhitespace(source.charAt(nextOffset))) {
+                    nextOffset++;
+                }
+            } else if (nextOffset < endOffset && !Character.isWhitespace(source.charAt(nextOffset))) {
+                result.append(' ');
+            }
+            copiedUntil = nextOffset;
         }
         result.append(source, copiedUntil, endOffset);
         return result.toString().trim();
