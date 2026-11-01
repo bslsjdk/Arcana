@@ -51,6 +51,7 @@ The first implementation branch establishes:
 - a loader-independent player-defined casting trigger recognizer and per-player session controller supporting embedded activation phrases, ordered cancellation, multi-word triggers, Unicode normalization, exact-token matching, ambiguity rejection, pending-source accumulation, and cooperative cancellation signals;
 - separate ordinary voice-command input from the explicit casting window: only voice-command mode recognizes player trigger phrases, while window text (typed or transcribed) is submitted directly and controlled by UI submit/cancel actions;
 - a dedicated casting-window session controller with bounded draft input, canonical preparation on submit, explicit runtime-start/complete transitions, cooperative cancellation for running casts, and UI-detach semantics that do not cancel the session;
+- strict, versioned player language/trigger profiles with bounded JSON encoding, UUID-indexed world storage, and Overworld `SavedData` persistence; learned knowledge and capability permissions are deliberately excluded from these configuration records;
 - a deterministic casting source-preparation pipeline that translates player language, parses canonical source, and performs static semantic validation without executing capabilities;
 - the older free-form graph retained only as a legacy prototype.
 
