@@ -115,6 +115,29 @@ class CanonicalNodeEvaluatorTest {
     }
 
     @Test
+    void outputSlotBudgetIsSeparateFromNodeStepBudget() {
+        var evaluator = new CanonicalNodeEvaluator(addWeave(), registry, budget(10, 0));
+
+        assertEquals(CanonicalNodeEvaluator.Status.BUDGET_EXHAUSTED,
+                evaluator.evaluate("a").status());
+        assertEquals(1, evaluator.budgetSnapshot().nodeSteps());
+        assertEquals(0, evaluator.budgetSnapshot().runtimeValues());
+    }
+
+    @Test
+    void reevaluatingAReferenceReplacesItsOutputWithoutAllocatingAnotherSlot() {
+        var evaluator = new CanonicalNodeEvaluator(
+                new ArcaneWeave.CanonicalWeave("arcana:replace_test", 1, List.of(
+                        glyph("constant", "arcana:reference/number", Map.of("value", "5"))
+                )), registry, budget(4, 1));
+
+        assertEquals(CanonicalNodeEvaluator.Status.EVALUATED, evaluator.evaluate("constant").status());
+        assertEquals(CanonicalNodeEvaluator.Status.EVALUATED, evaluator.evaluate("constant").status());
+        assertEquals(2, evaluator.budgetSnapshot().nodeSteps());
+        assertEquals(1, evaluator.budgetSnapshot().runtimeValues());
+    }
+
+    @Test
     void unknownGlyphAndUnsupportedSymbolAreRejected() {
         var weave = new ArcaneWeave.CanonicalWeave("arcana:unsupported_test", 1, List.of(
                 glyph("entity", "arcana:reference/entity", Map.of("selector", "nearest"))
