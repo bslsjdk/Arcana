@@ -269,3 +269,21 @@ The activation marker may therefore be embedded among ordinary incantation words
 The trigger recognizer and casting-session controller are separate from the canonical weave scheduler. The recognizer handles player-language tokens and control markers; the session controller owns pending/active/cancelled cast state; the scheduler remains responsible only for interpreting an already validated canonical weave. Cancellation requests are cooperative runtime signals checked at interpreter boundaries. Effects already committed to the world are not implicitly rolled back; each future capability must define its own transactional or reversible behavior.
 
 This is a design baseline, not an implemented feature. Audio capture, speech recognition, trigger-profile persistence, streaming language translation, casting-session orchestration, and in-game configuration UI are not yet implemented.
+
+## 17. First embedded-trigger recognizer implementation
+
+`CastingTriggerRecognizer` is the first loader-independent implementation slice for the trigger protocol. It accepts a `TriggerProfile` containing player-defined activation and cancellation phrases and analyzes one complete recognized input batch. The current implementation:
+
+- supports multiple activation and cancellation phrases per profile, including multi-word phrases;
+- applies Unicode NFKC normalization and case-insensitive matching;
+- matches complete letter/digit/underscore tokens rather than substrings;
+- permits activation at the beginning, middle, or end of the incantation;
+- removes activation markers from the canonical-language payload while preserving the surrounding source text;
+- treats cancellation before activation as discarding the pending incantation;
+- treats cancellation after activation as an abort request and truncates the current batch at the cancellation marker;
+- rejects identical or overlapping activation/cancellation phrases as ambiguous;
+- applies bounded source, token, phrase-count, and phrase-length limits.
+
+The recognizer returns a decision and payload only. It does not itself start or stop a cast, invoke `CanonicalWeaveScheduler`, access Minecraft, or mutate the world. A casting-session controller must consume the result and own pending/active/cancelled lifecycle state. The current recognizer analyzes complete batches; incremental audio capture, speech recognition, cross-batch partial-phrase buffering, persistent trigger profiles, and the in-game configuration UI remain future work.
+
+Tests cover activation placement, ordered cancellation, multi-word phrases, exact-token matching, Unicode compatibility normalization, overlapping-trigger rejection, and input limits.
