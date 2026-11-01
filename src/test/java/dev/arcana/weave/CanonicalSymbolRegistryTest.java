@@ -29,8 +29,10 @@ class CanonicalSymbolRegistryTest {
                 new ArcaneWeave.CanonicalGlyph("repeat", "arcana:control/repeat",
                         Map.of("maxIterations", maxIterations)),
                 new ArcaneWeave.CanonicalGlyph("bodyNode", "arcana:control/entry", Map.of())
-        ), List.of(new ArcaneWeave.CanonicalConnection("start", "flow", "repeat", "flow")),
-                List.of(new ArcaneWeave.CanonicalRegion("body", "repeat", "body",
+        ), List.of(
+                new ArcaneWeave.CanonicalConnection("start", "flow", "repeat", "flow"),
+                new ArcaneWeave.CanonicalConnection("repeat", "body", "bodyNode", "flow")
+        ), List.of(new ArcaneWeave.CanonicalRegion("body", "repeat", "body",
                         "bodyNode", "bodyNode", List.of("bodyNode"), null)));
     }
 
@@ -172,12 +174,17 @@ class CanonicalSymbolRegistryTest {
                 new ArcaneWeave.CanonicalGlyph("condition", "arcana:data/equal", Map.of()),
                 new ArcaneWeave.CanonicalGlyph("branch", "arcana:control/branch", Map.of()),
                 new ArcaneWeave.CanonicalGlyph("trueStart", "arcana:control/entry", Map.of()),
-                new ArcaneWeave.CanonicalGlyph("falseStart", "arcana:control/entry", Map.of())
+                new ArcaneWeave.CanonicalGlyph("falseStart", "arcana:control/entry", Map.of()),
+                new ArcaneWeave.CanonicalGlyph("join", "arcana:control/join", Map.of())
         ), List.of(
                 new ArcaneWeave.CanonicalConnection("start", "flow", "branch", "flow"),
                 new ArcaneWeave.CanonicalConnection("left", "number", "condition", "left"),
                 new ArcaneWeave.CanonicalConnection("right", "number", "condition", "right"),
-                new ArcaneWeave.CanonicalConnection("condition", "result", "branch", "condition")
+                new ArcaneWeave.CanonicalConnection("condition", "result", "branch", "condition"),
+                new ArcaneWeave.CanonicalConnection("branch", "whenTrue", "trueStart", "flow"),
+                new ArcaneWeave.CanonicalConnection("branch", "whenFalse", "falseStart", "flow"),
+                new ArcaneWeave.CanonicalConnection("trueStart", "flow", "join", "left"),
+                new ArcaneWeave.CanonicalConnection("falseStart", "flow", "join", "right")
         ), List.of(
                 new ArcaneWeave.CanonicalRegion("trueArm", "branch", "whenTrue",
                         "trueStart", "trueStart", List.of("trueStart"), null),
