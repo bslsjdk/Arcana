@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParseException;
 import com.google.gson.JsonParser;
 
 import java.util.LinkedHashMap;
@@ -74,7 +75,12 @@ public final class PlayerArcanaProfileStore {
             throw new IllegalArgumentException("World profile data exceeds the storage size limit.");
         }
 
-        JsonElement parsed = JsonParser.parseString(json);
+        final JsonElement parsed;
+        try {
+            parsed = JsonParser.parseString(json);
+        } catch (JsonParseException exception) {
+            throw new IllegalArgumentException("Invalid world profile JSON.", exception);
+        }
         if (!parsed.isJsonObject()) throw new IllegalArgumentException("World profile root must be an object.");
         JsonObject root = parsed.getAsJsonObject();
         requireKeys(root, Set.of("schemaVersion", "profiles"), "world profile root");
@@ -107,6 +113,9 @@ public final class PlayerArcanaProfileStore {
             UUID playerId;
             try {
                 playerId = UUID.fromString(entry.getKey());
+                if (!playerId.toString().equals(entry.getKey())) {
+                    throw new IllegalArgumentException("Player UUID must use canonical lowercase form.");
+                }
             } catch (IllegalArgumentException exception) {
                 throw new IllegalArgumentException("Invalid player UUID in world profile data.", exception);
             }
