@@ -127,11 +127,12 @@ public final class CastingWindowSessionController {
      */
     public synchronized Snapshot cancel() {
         if (isTerminal(state)) return snapshot("Session is already terminal.");
-        if (state == State.RUNNING) cancellationRequested.set(true);
+        boolean wasRunning = state == State.RUNNING;
+        if (wasRunning) cancellationRequested.set(true);
         source.setLength(0);
         preparation = null;
         state = State.CANCELLED;
-        diagnostic = state == State.RUNNING
+        diagnostic = wasRunning
                 ? "Runtime cancellation requested."
                 : "Casting-window draft cancelled.";
         return snapshot(diagnostic);
