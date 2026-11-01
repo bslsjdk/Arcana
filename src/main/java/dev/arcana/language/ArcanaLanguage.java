@@ -194,8 +194,15 @@ public final class ArcanaLanguage {
             keywordAliases = Map.copyOf(normalized);
             Set<List<String>> patterns = new java.util.HashSet<>();
             for (PhraseRule rule : phraseRules) {
-                if (!patterns.add(tokenPattern(rule.sourcePhrase()))) {
+                List<String> pattern = tokenPattern(rule.sourcePhrase());
+                if (!patterns.add(pattern)) {
                     throw new IllegalArgumentException("Conflicting duplicate phrase pattern: " + rule.sourcePhrase());
+                }
+                if (pattern.size() == 1 && pattern.getFirst().startsWith("IDENTIFIER:")) {
+                    String alias = pattern.getFirst().substring("IDENTIFIER:".length());
+                    if (keywordAliases.containsKey(alias)) {
+                        throw new IllegalArgumentException("A phrase rule conflicts with a keyword alias: " + alias);
+                    }
                 }
             }
         }
