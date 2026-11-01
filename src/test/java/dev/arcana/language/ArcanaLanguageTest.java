@@ -124,13 +124,23 @@ class ArcanaLanguageTest {
     }
 
     @Test
-    void rejectsExcessivePhraseExpansion() {
-        var language = new ArcanaLanguage.LanguageDefinition("player:expansion", 1, Map.of(),
-                java.util.List.of(new ArcanaLanguage.PhraseRule("x", "z".repeat(65_537))));
-        var translated = ArcanaLanguage.translate("x", language);
+    void rejectsPhraseRulesThatExceedConfigurationBounds() {
+        assertThrows(IllegalArgumentException.class, () ->
+                new ArcanaLanguage.PhraseRule("x", "z".repeat(4_097)));
+        assertThrows(IllegalArgumentException.class, () ->
+                new ArcanaLanguage.PhraseRule("x".repeat(257), "spell"));
+    }
 
-        assertFalse(translated.successful());
-        assertEquals("TRANS_OUTPUT_TOO_LARGE", translated.diagnostics().getFirst().code());
+    @Test
+    void rejectsTooManyOrOversizedKeywordAliases() {
+        var tooMany = new java.util.LinkedHashMap<String, String>();
+        for (int i = 0; i < 513; i++) tooMany.put("alias" + i, "spell");
+        assertThrows(IllegalArgumentException.class, () ->
+                new ArcanaLanguage.LanguageDefinition("player:many", 1, tooMany));
+
+        assertThrows(IllegalArgumentException.class, () ->
+                new ArcanaLanguage.LanguageDefinition("player:long", 1,
+                        Map.of("x".repeat(129), "spell")));
     }
 
     @Test
