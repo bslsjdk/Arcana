@@ -47,6 +47,7 @@ class CanonicalControlFlowPlanTest {
         assertEquals("join", branch.joinGlyph());
         assertEquals("left", branch.trueJoinPort());
         assertEquals("right", branch.falseJoinPort());
+        assertEquals(CanonicalControlFlowPlan.JoinSemantics.SELECTED_ARM_MERGE, branch.joinSemantics());
         assertNotEquals(branch.trueRegionId(), branch.falseRegionId());
     }
 
