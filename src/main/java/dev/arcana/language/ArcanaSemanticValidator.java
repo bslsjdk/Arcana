@@ -40,9 +40,10 @@ public final class ArcanaSemanticValidator {
                 if (actual != null && !declared.equals(actual)) {
                     error(diagnostics, "SEM_TYPE_MISMATCH",
                             "Cannot assign " + actual + " to " + declared + ".", let.initializer().span());
-                    continue;
                 }
-                if (actual != null) symbols.put(let.name(), declared);
+                // A syntactically declared name remains reserved even when its
+                // initializer is invalid, so later duplicate checks stay stable.
+                symbols.put(let.name(), declared);
             } else if (statement instanceof ArcanaLanguage.InvokeStatement invoke) {
                 if (!invoke.capabilityId().matches("[a-z0-9_.-]+:[a-z0-9_./-]+")) {
                     error(diagnostics, "SEM_INVALID_CAPABILITY_ID",
