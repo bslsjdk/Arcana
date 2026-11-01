@@ -100,8 +100,9 @@ class PlayerArcanaProfileStoreTest {
         assertThrows(IllegalArgumentException.class,
                 () -> PlayerArcanaProfileStore.decode("{broken"));
         assertThrows(IllegalArgumentException.class,
-                () -> PlayerArcanaProfileStore.decode(
-                        """{"schemaVersion":1,"profiles":{"1-1-1-1-1":{}}}"""));
+                () -> PlayerArcanaProfileStore.decode("""
+                        {"schemaVersion":1,"profiles":{"1-1-1-1-1":{}}}
+                        """));
     }
 
     @Test
