@@ -8,15 +8,33 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 class CanonicalSymbolRegistryTest {
-    @Test
-    void acceptsConcreteArcanaStandardSymbols() {
-        var registry = ArcaneWeave.StandardSymbolRegistry.builtins();
-        var weave = new ArcaneWeave.CanonicalWeave("arcana:registered", 1, List.of(
+    private static ArcaneWeave.CanonicalWeave lightWeave(String id) {
+        return new ArcaneWeave.CanonicalWeave(id, 1, List.of(
                 new ArcaneWeave.CanonicalGlyph("start", "arcana:control/entry", Map.of()),
-                new ArcaneWeave.CanonicalGlyph("end", "arcana:effect/light", Map.of())
+                new ArcaneWeave.CanonicalGlyph("position", "arcana:reference/position",
+                        Map.of("x", "0", "y", "64", "z", "0")),
+                new ArcaneWeave.CanonicalGlyph("level", "arcana:reference/number",
+                        Map.of("value", "12")),
+                new ArcaneWeave.CanonicalGlyph("light", "arcana:effect/light", Map.of())
+        ), List.of(
+                new ArcaneWeave.CanonicalConnection("start", "flow", "light", "flow"),
+                new ArcaneWeave.CanonicalConnection("position", "position", "light", "position"),
+                new ArcaneWeave.CanonicalConnection("level", "number", "light", "level")
         ));
+    }
 
-        assertTrue(ArcaneWeave.validateCanonical(weave, registry).valid());
+    private static ArcaneWeave.CanonicalWeave repeatWeave(String id, String maxIterations) {
+        return new ArcaneWeave.CanonicalWeave(id, 1, List.of(
+                new ArcaneWeave.CanonicalGlyph("start", "arcana:control/entry", Map.of()),
+                new ArcaneWeave.CanonicalGlyph("repeat", "arcana:control/repeat",
+                        Map.of("maxIterations", maxIterations))
+        ), List.of(new ArcaneWeave.CanonicalConnection("start", "flow", "repeat", "flow")));
+    }
+
+    @Test
+    void acceptsConcreteArcanaStandardSymbolsAndTypedConnections() {
+        var registry = ArcaneWeave.StandardSymbolRegistry.builtins();
+        assertTrue(ArcaneWeave.validateCanonical(lightWeave("arcana:registered"), registry).valid());
         assertFalse(registry.contains("player:my_custom_magic"));
     }
 
@@ -48,13 +66,15 @@ class CanonicalSymbolRegistryTest {
 
     @Test
     void rejectsParametersThatAreNotPartOfTheStandardSymbolDefinition() {
-        var weave = new ArcaneWeave.CanonicalWeave("arcana:forged", 1, List.of(
-                new ArcaneWeave.CanonicalGlyph("repeat", "arcana:control/repeat",
-                        Map.of("inventedOperation", "anything", "maxIterations", "4"))
-        ));
+        var weave = repeatWeave("arcana:forged", "4");
+        var forged = new ArcaneWeave.CanonicalWeave(weave.id(), weave.version(),
+                List.of(new ArcaneWeave.CanonicalGlyph("start", "arcana:control/entry", Map.of()),
+                        new ArcaneWeave.CanonicalGlyph("repeat", "arcana:control/repeat",
+                                Map.of("inventedOperation", "anything", "maxIterations", "4"))),
+                weave.connections());
 
         var result = ArcaneWeave.validateCanonical(
-                weave, ArcaneWeave.StandardSymbolRegistry.builtins());
+                forged, ArcaneWeave.StandardSymbolRegistry.builtins());
 
         assertTrue(result.diagnostics().stream()
                 .anyMatch(issue -> issue.code().equals("CANONICAL_UNKNOWN_PARAMETER")));
@@ -62,18 +82,9 @@ class CanonicalSymbolRegistryTest {
 
     @Test
     void repetitionParameterIsTypedAndBoundedByRegistry() {
-        var valid = new ArcaneWeave.CanonicalWeave("arcana:bounded", 1, List.of(
-                new ArcaneWeave.CanonicalGlyph("repeat", "arcana:control/repeat",
-                        Map.of("maxIterations", "12"))
-        ));
-        var invalid = new ArcaneWeave.CanonicalWeave("arcana:unbounded", 1, List.of(
-                new ArcaneWeave.CanonicalGlyph("repeat", "arcana:control/repeat",
-                        Map.of("maxIterations", "1025"))
-        ));
-        var malformed = new ArcaneWeave.CanonicalWeave("arcana:malformed", 1, List.of(
-                new ArcaneWeave.CanonicalGlyph("repeat", "arcana:control/repeat",
-                        Map.of("maxIterations", "many"))
-        ));
+        var valid = repeatWeave("arcana:bounded", "12");
+        var invalid = repeatWeave("arcana:unbounded", "1025");
+        var malformed = repeatWeave("arcana:malformed", "many");
 
         var registry = ArcaneWeave.StandardSymbolRegistry.builtins();
         assertTrue(ArcaneWeave.validateCanonical(valid, registry).valid());
@@ -104,8 +115,36 @@ class CanonicalSymbolRegistryTest {
         assertEquals(ArcaneWeave.Essence.BOOLEAN, branch.inputs().get("condition").essence());
         assertEquals(ArcaneWeave.Essence.SIGNAL, branch.outputs().get("whenTrue").essence());
         assertEquals("arcana:world/set_light", light.capabilityId());
-        assertThrows(UnsupportedOperationException.class,
-                () -> branch.inputs().clear());
+        assertThrows(UnsupportedOperationException.class, () -> branch.inputs().clear());
+    }
+
+    @Test
+    void rejectsConnectionsThatForgeOrMismatchStandardPorts() {
+        var mismatch = new ArcaneWeave.CanonicalWeave("arcana:mismatch", 1, List.of(
+                new ArcaneWeave.CanonicalGlyph("position", "arcana:reference/position",
+                        Map.of("x", "0", "y", "0", "z", "0")),
+                new ArcaneWeave.CanonicalGlyph("light", "arcana:effect/light", Map.of())
+        ), List.of(new ArcaneWeave.CanonicalConnection(
+                "position", "position", "light", "level")));
+
+        var forged = new ArcaneWeave.CanonicalWeave("arcana:forged_port", 1, List.of(
+                new ArcaneWeave.CanonicalGlyph("start", "arcana:control/entry", Map.of()),
+                new ArcaneWeave.CanonicalGlyph("light", "arcana:effect/light", Map.of())
+        ), List.of(new ArcaneWeave.CanonicalConnection(
+                "start", "playerMadePort", "light", "flow")));
+
+        var registry = ArcaneWeave.StandardSymbolRegistry.builtins();
+        assertTrue(ArcaneWeave.validateCanonical(mismatch, registry).diagnostics().stream()
+                .anyMatch(issue -> issue.code().equals("CANONICAL_PORT_TYPE_MISMATCH")));
+        assertTrue(ArcaneWeave.validateCanonical(forged, registry).diagnostics().stream()
+                .anyMatch(issue -> issue.code().equals("CANONICAL_UNKNOWN_OUTPUT_PORT")));
+    }
+
+    @Test
+    void canonicalComplexityUsesRegistryWeightsNotSourceLength() {
+        var weave = lightWeave("arcana:complexity");
+        assertEquals(6, ArcaneWeave.canonicalComplexity(
+                weave, ArcaneWeave.StandardSymbolRegistry.builtins()));
     }
 
     @Test
