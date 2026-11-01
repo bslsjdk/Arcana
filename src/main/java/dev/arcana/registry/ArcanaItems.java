@@ -5,7 +5,7 @@ import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
 /**
- * Initial player-facing casting media.
+ * Initial non-weapon casting media.
  *
  * These items are intentionally inert in this milestone. Spell storage,
  * menus, and casting interactions will be added as separate server-validated
@@ -19,12 +19,8 @@ public final class ArcanaItems {
             ITEMS.registerItem("grimoire", Item::new,
                     new Item.Properties().stacksTo(1));
 
-    public static final DeferredItem<Item> WAND =
-            ITEMS.registerItem("wand", Item::new,
-                    new Item.Properties().stacksTo(1));
-
-    public static final DeferredItem<Item> STAFF =
-            ITEMS.registerItem("staff", Item::new,
+    public static final DeferredItem<Item> FOCUS_CRYSTAL =
+            ITEMS.registerItem("focus_crystal", Item::new,
                     new Item.Properties().stacksTo(1));
 
     public static final DeferredItem<Item> SCROLL =
