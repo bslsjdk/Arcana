@@ -241,6 +241,7 @@ public final class CanonicalWeaveScheduler {
         }
         String activation = "activation" + (++state.activationSequence);
         Status failure = null;
+        boolean activationStarted = false;
         try {
             for (int i = 0; i < repeat.maximumIterations(); i++) {
                 if (state.cancelled()) { failure = Status.CANCELLED; break; }
@@ -252,14 +253,17 @@ public final class CanonicalWeaveScheduler {
                             ? Status.BUDGET_EXHAUSTED : Status.FAILED;
                     break;
                 }
+                activationStarted = true;
                 Status bodyStatus = executeRegion(body, state);
                 if (bodyStatus != null) { failure = bodyStatus; break; }
             }
         } finally {
-            var finished = budget.finishLoop(repeat.ownerGlyph(), activation);
-            if (finished != CanonicalExecutionBudget.Admission.ACCEPTED) {
-                state.diagnostics.add("Repeat activation accounting could not be finalized.");
-                if (failure == null) failure = Status.FAILED;
+            if (activationStarted) {
+                var finished = budget.finishLoop(repeat.ownerGlyph(), activation);
+                if (finished != CanonicalExecutionBudget.Admission.ACCEPTED) {
+                    state.diagnostics.add("Repeat activation accounting could not be finalized.");
+                    if (failure == null) failure = Status.FAILED;
+                }
             }
         }
         if (failure != null) { state.failure = failure; return null; }
