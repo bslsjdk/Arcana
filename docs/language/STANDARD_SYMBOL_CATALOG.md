@@ -77,6 +77,7 @@ A reference is not permission to mutate the referenced object. Every world read/
 | Symbol ID | Inputs | Outputs | Parameters |
 |---|---|---|---|
 | `arcana:reference/position` | none | `position:VECTOR3` | Required finite decimal `x`, `y`, `z` |
+| `arcana:reference/number` | none | `number:NUMBER` | Required finite decimal `value` |
 | `arcana:reference/entity` | none | `entity:ENTITY_REF` | Required identifier `selector`; selector grammar and permissions are not yet implemented |
 
 ### Constraints and effects
@@ -114,4 +115,4 @@ Each concrete definition owns:
 - optional registered capability ID;
 - whether it is a concrete instantiable symbol or a non-instantiable family heading.
 
-Validation rejects unknown IDs, attempts to instantiate family headings, unknown or missing parameters, malformed parameter types, and out-of-range values. Player-authored instances contain only an instance ID, a canonical symbol ID, and parameter values. They never contain port declarations, capability mappings, or executable semantics.
+Validation rejects unknown IDs, attempts to instantiate family headings, unknown or missing parameters, malformed parameter types, and out-of-range values. Canonical connections are checked against the source symbol's registered output ports and target symbol's registered input ports; unknown ports, incompatible types, duplicate bindings, unbound required inputs, and raw cycles are rejected. Structural complexity is summed from registry-owned symbol weights, not from the source language. Player-authored instances contain only an instance ID, a canonical symbol ID, and parameter values. They never contain port declarations, capability mappings, or executable semantics.
