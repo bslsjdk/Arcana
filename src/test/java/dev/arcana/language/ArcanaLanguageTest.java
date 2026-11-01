@@ -116,6 +116,24 @@ class ArcanaLanguageTest {
     }
 
     @Test
+    void rejectsPhraseRuleThatConflictsWithKeywordAlias() {
+        assertThrows(IllegalArgumentException.class, () ->
+                new ArcanaLanguage.LanguageDefinition("player:collision", 1,
+                        Map.of("spark", "spell"),
+                        java.util.List.of(new ArcanaLanguage.PhraseRule("spark", "invoke"))));
+    }
+
+    @Test
+    void rejectsExcessivePhraseExpansion() {
+        var language = new ArcanaLanguage.LanguageDefinition("player:expansion", 1, Map.of(),
+                java.util.List.of(new ArcanaLanguage.PhraseRule("x", "z".repeat(65_537))));
+        var translated = ArcanaLanguage.translate("x", language);
+
+        assertFalse(translated.successful());
+        assertEquals("TRANS_OUTPUT_TOO_LARGE", translated.diagnostics().getFirst().code());
+    }
+
+    @Test
     void enforcesInputSizeLimit() {
         var lex = ArcanaLanguage.lex("x".repeat(65_537));
         assertTrue(lex.hasErrors());
