@@ -192,7 +192,7 @@ public final class CanonicalScript {
                             "\\^([a-zA-Z0-9][a-zA-Z0-9_.-]*)\\(([a-zA-Z0-9][a-zA-Z0-9_.-]*)\\.([a-zA-Z][a-zA-Z0-9_]*)\\)\\[([a-zA-Z0-9][a-zA-Z0-9_.-]*)>([a-zA-Z0-9][a-zA-Z0-9_.-]*)\\.([a-zA-Z][a-zA-Z0-9_]*)\\]\\(([a-zA-Z0-9_.,-]+)\\)@(-|[a-zA-Z0-9][a-zA-Z0-9_.-]*)")
                             .matcher(declaration);
                     if (!matcher.matches()) throw new IllegalArgumentException("SCRIPT_INVALID_REGION");
-                    List<String> members = java.util.Arrays.stream(matcher.group(6).split(","))
+                    List<String> members = java.util.Arrays.stream(matcher.group(7).split(","))
                             .map(String::trim).toList();
                     regions.add(new dev.arcana.weave.ArcaneWeave.CanonicalRegion(
                             matcher.group(1), matcher.group(2), matcher.group(3),
