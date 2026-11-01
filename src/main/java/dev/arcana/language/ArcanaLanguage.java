@@ -43,13 +43,17 @@ public final class ArcanaLanguage {
         if (lexed.hasErrors()) return new TranslationResult(null, lexed.diagnostics());
 
         List<Token> tokens = lexed.tokens();
+        Map<PhraseRule, List<String>> compiledPatterns = new LinkedHashMap<>();
+        for (PhraseRule rule : language.phraseRules()) {
+            compiledPatterns.put(rule, tokenPattern(rule.sourcePhrase()));
+        }
         StringBuilder output = new StringBuilder(source.length());
         int copiedUntil = 0;
         for (int i = 0; i < tokens.size() - 1;) {
             PhraseRule matched = null;
             int matchedLength = 0;
             for (PhraseRule rule : language.phraseRules()) {
-                List<String> pattern = tokenPattern(rule.sourcePhrase());
+                List<String> pattern = compiledPatterns.get(rule);
                 if (pattern.size() <= matchedLength || i + pattern.size() > tokens.size() - 1) continue;
                 boolean same = true;
                 for (int offset = 0; offset < pattern.size(); offset++) {
